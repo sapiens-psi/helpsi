@@ -1,0 +1,78 @@
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
+
+export const useConsultations = () => {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['consultations', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('consultations')
+        .select(`
+          *,
+          client:client_id (full_name, phone),
+          specialist:specialist_id (
+            *,
+            profiles:user_id (full_name, crp)
+          )
+        `)
+        .order('scheduled_date', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user
+  });
+};
+
+export const useCreateConsultation = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (consultationData: any) => {
+      if (!user) throw new Error('User not authenticated');
+      
+      const { data, error } = await supabase
+        .from('consultations')
+        .insert({
+          ...consultationData,
+          client_id: user.id
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consultations'] });
+    }
+  });
+};
+
+export const useUpdateConsultation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updateData }: any) => {
+      const { data, error } = await supabase
+        .from('consultations')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consultations'] });
+    }
+  });
+};
