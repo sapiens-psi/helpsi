@@ -264,6 +264,69 @@ export type Database = {
           },
         ]
       }
+      company_profile: {
+        Row: {
+          id: string
+          name: string
+          cnpj: string | null
+          email: string | null
+          phone: string | null
+          address: string | null
+          description: string | null
+          site: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          cnpj?: string | null
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          description?: string | null
+          site?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          cnpj?: string | null
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          description?: string | null
+          site?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      },
+      schedule_config: {
+        Row: {
+          id: string
+          business_hours: Json | null
+          holidays: Json | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          business_hours?: Json | null
+          holidays?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          business_hours?: Json | null
+          holidays?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      },
     }
     Views: {
       [_ in never]: never

@@ -1,12 +1,10 @@
-
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Navigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { User, Lock } from 'lucide-react';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -16,7 +14,6 @@ const Auth = () => {
   const [phone, setPhone] = useState('');
   const [cpfCnpj, setCpfCnpj] = useState('');
   const [loading, setLoading] = useState(false);
-  
   const { signIn, signUp, user } = useAuth();
   const { toast } = useToast();
 
@@ -27,16 +24,11 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) throw error;
-        
-        toast({
-          title: "Login realizado com sucesso!",
-          description: "Bem-vindo de volta!"
-        });
+        toast({ title: 'Login realizado com sucesso!', description: 'Bem-vindo de volta!' });
       } else {
         const { error } = await signUp(email, password, {
           full_name: fullName,
@@ -44,107 +36,108 @@ const Auth = () => {
           cpf_cnpj: cpfCnpj
         });
         if (error) throw error;
-        
-        toast({
-          title: "Conta criada com sucesso!",
-          description: "Você já pode fazer login."
-        });
+        toast({ title: 'Conta criada com sucesso!', description: 'Você já pode fazer login.' });
         setIsLogin(true);
       }
     } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive"
-      });
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-center text-2xl font-bold text-blue-600">
-            {isLogin ? 'Entrar' : 'Criar Conta'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <>
-                <div>
-                  <Label htmlFor="fullName">Nome Completo</Label>
-                  <Input
-                    id="fullName"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Telefone</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="cpfCnpj">CPF/CNPJ</Label>
-                  <Input
-                    id="cpfCnpj"
-                    type="text"
-                    value={cpfCnpj}
-                    onChange={(e) => setCpfCnpj(e.target.value)}
-                    required
-                  />
-                </div>
-              </>
-            )}
-            
-            <div>
-              <Label htmlFor="email">Email</Label>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#7b2ff2] via-[#f357a8] to-[#0a223a]">
+      <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-lg p-10 w-full max-w-sm flex flex-col items-center">
+        <div className="bg-white/20 rounded-full p-4 mb-6">
+          <User className="text-white" size={48} />
+        </div>
+        <h2 className="text-xl font-light tracking-widest text-white mb-8">
+          {isLogin ? 'LOGIN DO CLIENTE' : 'CADASTRO'}
+        </h2>
+        <form onSubmit={handleSubmit} className="w-full flex flex-col gap-6">
+          {!isLogin && (
+            <>
               <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="fullName"
+                type="text"
+                placeholder="Nome completo"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
                 required
+                className="pl-4 pr-4 py-2 rounded bg-transparent border-b border-white/40 text-white placeholder-white/70 focus:outline-none"
               />
-            </div>
-            
-            <div>
-              <Label htmlFor="password">Senha</Label>
               <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                id="phone"
+                type="tel"
+                placeholder="Telefone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 required
+                className="pl-4 pr-4 py-2 rounded bg-transparent border-b border-white/40 text-white placeholder-white/70 focus:outline-none"
               />
-            </div>
-            
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Carregando...' : isLogin ? 'Entrar' : 'Criar Conta'}
-            </Button>
-          </form>
-          
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-blue-600 hover:underline"
-            >
-              {isLogin ? 'Não tem conta? Criar conta' : 'Já tem conta? Fazer login'}
-            </button>
+              <Input
+                id="cpfCnpj"
+                type="text"
+                placeholder="CPF/CNPJ"
+                value={cpfCnpj}
+                onChange={(e) => setCpfCnpj(e.target.value)}
+                required
+                className="pl-4 pr-4 py-2 rounded bg-transparent border-b border-white/40 text-white placeholder-white/70 focus:outline-none"
+              />
+            </>
+          )}
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70" size={20} />
+            <Input
+              id="email"
+              type="email"
+              placeholder="E-mail"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="pl-10 pr-4 py-2 rounded bg-transparent border-b border-white/40 text-white placeholder-white/70 focus:outline-none"
+            />
           </div>
-        </CardContent>
-      </Card>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70" size={20} />
+            <Input
+              id="password"
+              type="password"
+              placeholder="Senha"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="pl-10 pr-4 py-2 rounded bg-transparent border-b border-white/40 text-white placeholder-white/70 focus:outline-none"
+            />
+          </div>
+          <div className="flex items-center justify-between text-xs mt-2">
+            <label className="flex items-center text-white/80">
+              <input type="checkbox" className="mr-2 accent-pink-400" />
+              Lembrar de mim
+            </label>
+            {isLogin && (
+              <span className="text-white/70 hover:underline cursor-pointer">Esqueceu a senha?</span>
+            )}
+          </div>
+          <Button
+            type="submit"
+            className="w-full mt-4 bg-white/20 text-white font-bold py-2 rounded-lg tracking-widest hover:bg-white/30 transition"
+            disabled={loading}
+          >
+            {loading ? (isLogin ? 'Entrando...' : 'Cadastrando...') : isLogin ? 'ENTRAR' : 'CADASTRAR'}
+          </Button>
+        </form>
+        <div className="mt-6 text-center">
+          <button
+            type="button"
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-pink-200 hover:underline font-semibold"
+          >
+            {isLogin ? 'Não tem conta? Cadastre-se aqui' : 'Já tem conta? Faça login'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

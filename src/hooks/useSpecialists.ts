@@ -1,28 +1,19 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export const useSpecialists = () => {
+export function useSpecialists() {
   return useQuery({
     queryKey: ['specialists'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('specialists')
-        .select(`
-          *,
-          profiles:user_id (
-            full_name,
-            phone,
-            crp
-          )
-        `)
-        .eq('is_available', true);
-      
+        .select('*, profiles(full_name, phone, crp)')
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     }
   });
-};
+}
 
 export const useSpecialistSchedules = (specialistId: string) => {
   return useQuery({

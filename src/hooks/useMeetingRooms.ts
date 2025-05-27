@@ -1,47 +1,35 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export const useMeetingRoom = (consultationId: string) => {
+export function useMeetingRooms(type: 'pos-compra' | 'pre-compra') {
   return useQuery({
-    queryKey: ['meeting-room', consultationId],
+    queryKey: ['meeting-rooms', type],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('meeting_rooms')
         .select('*')
-        .eq('consultation_id', consultationId)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') throw error;
+        .eq('type', type)
+        .order('scheduled_at', { ascending: false });
+      if (error) throw error;
       return data;
-    },
-    enabled: !!consultationId
-  });
-};
+    }
+  }) as any;
+}
 
-export const useCreateMeetingRoom = () => {
+export function useCreateMeetingRoom() {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: async ({ consultationId }: { consultationId: string }) => {
-      const roomToken = `room-${consultationId}-${Date.now()}`;
-      
+    mutationFn: async (roomData: any) => {
       const { data, error } = await supabase
         .from('meeting_rooms')
-        .insert({
-          consultation_id: consultationId,
-          room_token: roomToken,
-          is_active: true,
-          started_at: new Date().toISOString()
-        })
+        .insert(roomData)
         .select()
         .single();
-      
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['meeting-room', data.consultation_id] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['meeting-rooms'] });
     }
   });
-};
+}

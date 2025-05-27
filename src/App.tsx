@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +14,9 @@ import ClientArea from "./pages/ClientArea";
 import Schedule from "./pages/Schedule";
 import VideoConference from "./pages/VideoConference";
 import NotFound from "./pages/NotFound";
+import MeusAgendamentos from './pages/MeusAgendamentos';
+import About from "./pages/About";
+import Contact from "./pages/Contact";
 
 // Admin Pages
 import Dashboard from "./pages/admin/Dashboard";
@@ -38,6 +40,8 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -64,6 +68,14 @@ const App = () => (
                   <VideoConference />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/meus-agendamentos" 
+              element={
+                <ProtectedRoute>
+                  <MeusAgendamentos />
+                </ProtectedRoute>
+              }
             />
             
             {/* Admin Routes */}

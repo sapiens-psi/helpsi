@@ -1,13 +1,25 @@
-
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { PulsatingButton } from '@/components/magicui/pulsating-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar, Clock, User } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator
+} from '@/components/ui/dropdown-menu';
 
 const Schedule = () => {
+  const { user, signOut } = useAuth();
+  const { data: profile } = useProfile();
+  const location = useLocation();
   const [selectedType, setSelectedType] = useState<'pos-compra' | 'pre-compra' | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
@@ -32,28 +44,85 @@ const Schedule = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-blue-100">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <Link to="/" className="text-2xl font-bold text-blue-600">
-            ConsultaPro
-          </Link>
-          <Link to="/client-area">
-            <Button variant="outline" className="border-blue-200 text-blue-600">
-              Área do Cliente
-            </Button>
-          </Link>
+    <div className="min-h-screen bg-gradient-to-br from-[#7b2ff2] via-[#f357a8] to-[#0a223a] flex flex-col">
+      {/* Navbar */}
+      <nav className="flex items-center justify-between px-10 py-6">
+        <div className="flex items-center gap-2">
+          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <polygon points="16,2 30,9 30,23 16,30 2,23 2,9" fill="#fff" fillOpacity="0.3" />
+              <polygon points="16,6 26,12 26,20 16,26 6,20 6,12" fill="#fff" fillOpacity="0.7" />
+            </svg>
+          </div>
+          <div>
+            <div className="text-white font-bold text-xl">COMPANY</div>
+            <div className="text-pink-200 text-xs">Slogan line</div>
+          </div>
         </div>
-      </header>
+        {/* Centralizar links principais */}
+        <div className="flex-1 flex justify-center gap-8 items-center text-white font-medium">
+          <Link to="/" className={`hover:text-pink-300 transition ${location.pathname === '/' ? 'lamp-effect' : ''}`}>Home</Link>
+          <Link to="/about" className={`hover:text-pink-300 transition ${location.pathname === '/about' ? 'lamp-effect' : ''}`}>Sobre</Link>
+          <Link to="/contact" className={`hover:text-pink-300 transition ${location.pathname === '/contact' ? 'lamp-effect' : ''}`}>Contato</Link>
+          {user && (
+            <>
+              <Link to="/schedule" className={`hover:text-pink-300 transition ${location.pathname === '/schedule' ? 'lamp-effect' : ''}`}>Agendar</Link>
+              <Link to="/client-area" className={`hover:text-pink-300 transition ${location.pathname === '/client-area' ? 'lamp-effect' : ''}`}>Área do Cliente</Link>
+            </>
+          )}
+        </div>
+        {/* Botão de perfil/menu à direita */}
+        <div className="flex gap-4 items-center">
+          {!user ? (
+            <>
+              <Link to="/auth">
+                <button className="px-4 py-2 rounded-lg bg-white/80 text-pink-500 font-bold hover:bg-white">Login</button>
+              </Link>
+              <Link to="/auth">
+                <button className="px-4 py-2 rounded-lg bg-pink-400 text-white font-bold hover:bg-pink-500">Cadastrar</button>
+              </Link>
+            </>
+          ) :
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <PulsatingButton
+                  pulseColor="#f472b6"
+                  className="bg-white/80 text-pink-500 font-bold hover:bg-white"
+                >
+                  {profile?.full_name || 'Perfil'}
+                </PulsatingButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {profile?.role === 'admin' ? (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin">Painel Administrativo</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link to="/client-area">Área do Cliente</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          }
+        </div>
+      </nav>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 flex-1">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-4">
+            <h1 className="text-4xl font-extrabold text-white mb-4 drop-shadow-lg">
               Agendar Consulta
             </h1>
-            <p className="text-gray-600">
+            <p className="text-pink-100 text-lg">
               Escolha o tipo de atendimento e selecione o melhor horário para você.
             </p>
           </div>
@@ -61,21 +130,21 @@ const Schedule = () => {
           <div className="grid lg:grid-cols-2 gap-8">
             {/* Type Selection */}
             <div className="space-y-6">
-              <Card className="border-blue-100 shadow-lg">
+              <Card className="border-pink-100 shadow-lg bg-white/90">
                 <CardHeader>
-                  <CardTitle className="text-gray-800">Tipo de Atendimento</CardTitle>
+                  <CardTitle className="text-pink-500">Tipo de Atendimento</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div
                     className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                       selectedType === 'pos-compra'
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-blue-300'
+                        ? 'border-pink-500 bg-pink-50'
+                        : 'border-gray-200 hover:border-pink-300'
                     }`}
                     onClick={() => setSelectedType('pos-compra')}
                   >
                     <div className="flex items-center mb-2">
-                      <Clock className="h-5 w-5 text-blue-600 mr-2" />
+                      <Clock className="h-5 w-5 text-pink-500 mr-2" />
                       <h3 className="font-semibold text-gray-800">Pós-Compra (15min gratuitos)</h3>
                     </div>
                     <p className="text-sm text-gray-600">
@@ -86,13 +155,13 @@ const Schedule = () => {
                   <div
                     className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                       selectedType === 'pre-compra'
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-gray-200 hover:border-green-300'
+                        ? 'border-purple-500 bg-purple-50'
+                        : 'border-gray-200 hover:border-purple-300'
                     }`}
                     onClick={() => setSelectedType('pre-compra')}
                   >
                     <div className="flex items-center mb-2">
-                      <User className="h-5 w-5 text-green-600 mr-2" />
+                      <User className="h-5 w-5 text-purple-500 mr-2" />
                       <h3 className="font-semibold text-gray-800">Auxílio Pré-Compra</h3>
                     </div>
                     <p className="text-sm text-gray-600">
@@ -103,9 +172,9 @@ const Schedule = () => {
               </Card>
 
               {selectedType && (
-                <Card className="border-blue-100 shadow-lg">
+                <Card className="border-pink-100 shadow-lg bg-white/90">
                   <CardHeader>
-                    <CardTitle className="text-gray-800">Descreva sua situação</CardTitle>
+                    <CardTitle className="text-pink-500">Descreva sua situação</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Textarea
@@ -116,7 +185,7 @@ const Schedule = () => {
                       }
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      className="min-h-32 border-gray-200 focus:border-blue-500"
+                      className="min-h-32 border-gray-200 focus:border-pink-500"
                     />
                   </CardContent>
                 </Card>
@@ -126,10 +195,10 @@ const Schedule = () => {
             {/* Date and Time Selection */}
             {selectedType && (
               <div className="space-y-6">
-                <Card className="border-blue-100 shadow-lg">
+                <Card className="border-pink-100 shadow-lg bg-white/90">
                   <CardHeader>
-                    <CardTitle className="flex items-center text-gray-800">
-                      <Calendar className="mr-2 h-5 w-5 text-blue-600" />
+                    <CardTitle className="flex items-center text-pink-500">
+                      <Calendar className="mr-2 h-5 w-5 text-pink-500" />
                       Selecionar Data e Horário
                     </CardTitle>
                   </CardHeader>
@@ -142,7 +211,7 @@ const Schedule = () => {
                         min={getMinDate()}
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:border-pink-500"
                       />
                     </div>
 
@@ -157,8 +226,8 @@ const Schedule = () => {
                               onClick={() => setSelectedTime(time)}
                               className={`p-2 text-sm border rounded transition-all ${
                                 selectedTime === time
-                                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                  : 'border-gray-200 hover:border-blue-300'
+                                  ? 'border-pink-500 bg-pink-50 text-pink-700'
+                                  : 'border-gray-200 hover:border-pink-300'
                               }`}
                             >
                               {time}
@@ -171,9 +240,9 @@ const Schedule = () => {
                 </Card>
 
                 {selectedDate && selectedTime && (
-                  <Card className="border-green-100 shadow-lg">
+                  <Card className="border-purple-100 shadow-lg bg-white/90">
                     <CardHeader>
-                      <CardTitle className="text-green-600">Resumo do Agendamento</CardTitle>
+                      <CardTitle className="text-purple-500">Resumo do Agendamento</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div className="flex justify-between">
@@ -201,7 +270,7 @@ const Schedule = () => {
                       
                       <Button 
                         onClick={handleSubmit}
-                        className="w-full bg-green-600 hover:bg-green-700 mt-4"
+                        className="w-full bg-purple-600 hover:bg-purple-700 mt-4"
                       >
                         Confirmar Agendamento
                       </Button>
@@ -212,6 +281,17 @@ const Schedule = () => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Nuvens rodapé */}
+      <div className="w-full h-32 relative">
+        <svg className="absolute bottom-0 left-0 w-full" height="100" viewBox="0 0 1440 100" fill="none">
+          <path
+            d="M0 40C360 80 1080 0 1440 40V100H0V40Z"
+            fill="#fff"
+            fillOpacity="0.7"
+          />
+        </svg>
       </div>
     </div>
   );

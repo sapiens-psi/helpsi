@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,38 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useProfile } from '@/hooks/useProfile';
 import { Search, User, Phone, Mail, Calendar } from 'lucide-react';
+import { useClients } from '@/hooks/useClients';
 
 const Clientes = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Mock data - em produção viria do hook useClients
-  const clients = [
-    {
-      id: '1',
-      full_name: 'João Silva',
-      email: 'joao@email.com',
-      phone: '(11) 99999-1111',
-      cpf_cnpj: '123.456.789-00',
-      created_at: '2024-01-15',
-      consultations_count: 3,
-      last_consultation: '2024-01-20'
-    },
-    {
-      id: '2',
-      full_name: 'Maria Santos',
-      email: 'maria@email.com',
-      phone: '(11) 99999-2222',
-      cpf_cnpj: '987.654.321-00',
-      created_at: '2024-01-10',
-      consultations_count: 1,
-      last_consultation: '2024-01-18'
-    }
-  ];
+  const { data: clients = [], isLoading } = useClients();
 
-  const filteredClients = clients.filter(client =>
+  const filteredClients = clients.filter((client: any) =>
     client.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.phone.includes(searchTerm)
+    client.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.phone?.includes(searchTerm)
   );
 
   return (
@@ -55,77 +32,78 @@ const Clientes = () => {
         </div>
       </div>
 
-      <div className="grid gap-6">
-        {filteredClients.map((client) => (
-          <Card key={client.id}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg flex items-center">
-                    <User className="mr-2 h-5 w-5" />
-                    {client.full_name}
-                  </CardTitle>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Cliente desde {new Date(client.created_at).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-                <Badge variant="outline">
-                  {client.consultations_count} consulta{client.consultations_count !== 1 ? 's' : ''}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                <div className="flex items-center text-sm">
-                  <Mail className="mr-2 h-4 w-4 text-gray-400" />
-                  <span>{client.email}</span>
-                </div>
-                
-                <div className="flex items-center text-sm">
-                  <Phone className="mr-2 h-4 w-4 text-gray-400" />
-                  <span>{client.phone}</span>
-                </div>
-                
-                <div className="flex items-center text-sm">
-                  <span className="font-medium mr-2">CPF:</span>
-                  <span>{client.cpf_cnpj}</span>
-                </div>
-              </div>
-              
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Calendar className="mr-1 h-4 w-4" />
-                    Última consulta: {new Date(client.last_consultation).toLocaleDateString('pt-BR')}
+      {isLoading ? (
+        <div className="text-center text-gray-500 py-8">Carregando clientes...</div>
+      ) : (
+        <div className="grid gap-6">
+          {filteredClients.map((client: any) => (
+            <Card key={client.id}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg flex items-center">
+                      <User className="mr-2 h-5 w-5" />
+                      {client.full_name}
+                    </CardTitle>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Cliente desde {client.created_at ? new Date(client.created_at).toLocaleDateString('pt-BR') : '-'}
+                    </p>
                   </div>
-                  
-                  <div className="space-x-2">
-                    <Button variant="outline" size="sm">
-                      Ver Histórico
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      Nova Consulta
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      Editar
-                    </Button>
+                  <Badge variant="outline">
+                    {/* Aqui você pode exibir o número de consultas se quiser buscar depois */}
+                    Cliente
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                  <div className="flex items-center text-sm">
+                    <Mail className="mr-2 h-4 w-4 text-gray-400" />
+                    <span>{client.email || '-'}</span>
+                  </div>
+                  <div className="flex items-center text-sm">
+                    <Phone className="mr-2 h-4 w-4 text-gray-400" />
+                    <span>{client.phone || '-'}</span>
+                  </div>
+                  <div className="flex items-center text-sm">
+                    <span className="font-medium mr-2">CPF/CNPJ:</span>
+                    <span>{client.cpf_cnpj || '-'}</span>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        
-        {filteredClients.length === 0 && (
-          <Card>
-            <CardContent className="text-center py-8">
-              <p className="text-gray-500">
-                {searchTerm ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Calendar className="mr-1 h-4 w-4" />
+                      {/* Aqui você pode exibir a última consulta se quiser buscar depois */}
+                      {/* Última consulta: ... */}
+                    </div>
+                    <div className="space-x-2">
+                      <Button variant="outline" size="sm">
+                        Ver Histórico
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        Nova Consulta
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        Editar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {filteredClients.length === 0 && (
+            <Card>
+              <CardContent className="text-center py-8">
+                <p className="text-gray-500">
+                  {searchTerm ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 };

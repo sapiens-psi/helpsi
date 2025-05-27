@@ -1,92 +1,98 @@
-
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, User } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { User, Lock } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const { signIn } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login attempt:', { email, password });
-    // Implementar lógica de login
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await signIn(email, password);
+      if (error) {
+        setError('E-mail ou senha inválidos.');
+        setLoading(false);
+        return;
+      }
+      navigate('/admin', { replace: true });
+    } catch (err) {
+      setError('Erro inesperado ao fazer login.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link to="/" className="text-3xl font-bold text-blue-600">
-            ConsultaPro
-          </Link>
-          <p className="text-gray-600 mt-2">Acesse sua conta</p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#7b2ff2] via-[#f357a8] to-[#0a223a]">
+      <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-lg p-10 w-full max-w-sm flex flex-col items-center">
+        {/* Ícone de usuário */}
+        <div className="bg-white/20 rounded-full p-4 mb-6">
+          <User className="text-white" size={48} />
         </div>
-
-        <Card className="border-blue-100 shadow-lg">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-gray-800">Login</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">E-mail</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 border-gray-200 focus:border-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Sua senha"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="border-gray-200 focus:border-blue-500"
-                  required
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center">
-                  <input type="checkbox" className="mr-2" />
-                  Lembrar-me
-                </label>
-                <Link to="/forgot-password" className="text-blue-600 hover:underline">
-                  Esqueceu a senha?
-                </Link>
-              </div>
-
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                Entrar
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <p className="text-gray-600">
-                Não tem conta?{' '}
-                <Link to="/register" className="text-blue-600 hover:underline font-semibold">
-                  Cadastre-se aqui
-                </Link>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Título */}
+        <h2 className="text-xl font-light tracking-widest text-white mb-8">LOGIN DO CLIENTE</h2>
+        {/* Formulário */}
+        {error && (
+          <div className="mb-2 text-red-400 text-center text-sm">{error}</div>
+        )}
+        <form onSubmit={handleSubmit} className="w-full flex flex-col gap-6">
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70" size={20} />
+            <Input
+              type="email"
+              placeholder="E-mail"
+              className="pl-10 pr-4 py-2 rounded bg-transparent border-b border-white/40 text-white placeholder-white/70 focus:outline-none"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70" size={20} />
+            <Input
+              type="password"
+              placeholder="Senha"
+              className="pl-10 pr-4 py-2 rounded bg-transparent border-b border-white/40 text-white placeholder-white/70 focus:outline-none"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex items-center justify-between text-xs mt-2">
+            <label className="flex items-center text-white/80">
+              <input type="checkbox" className="mr-2 accent-pink-400" />
+              Lembrar de mim
+            </label>
+            <Link to="/forgot-password" className="text-white/70 hover:underline">
+              Esqueceu a senha?
+            </Link>
+          </div>
+          <Button
+            type="submit"
+            className="w-full mt-4 bg-white/20 text-white font-bold py-2 rounded-lg tracking-widest hover:bg-white/30 transition"
+            disabled={loading}
+          >
+            {loading ? 'Entrando...' : 'ENTRAR'}
+          </Button>
+        </form>
+        <div className="mt-6 text-center">
+          <p className="text-white/80">
+            Não tem conta?{' '}
+            <Link to="/register" className="text-pink-200 hover:underline font-semibold">
+              Cadastre-se aqui
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

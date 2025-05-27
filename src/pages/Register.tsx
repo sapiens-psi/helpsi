@@ -1,11 +1,7 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, Mail } from 'lucide-react';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -27,164 +23,141 @@ const Register = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Registration attempt:', formData);
-    // Implementar lógica de cadastro
+    // Lógica de cadastro
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
-        <div className="text-center mb-8">
-          <Link to="/" className="text-3xl font-bold text-blue-600">
-            ConsultaPro
-          </Link>
-          <p className="text-gray-600 mt-2">Crie sua conta</p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#0a223a] to-[#18344d] relative">
+      {/* Ícone de idioma */}
+      <div className="absolute top-6 right-8">
+        <span className="text-white text-sm cursor-pointer">🇧🇷 PT</span>
+      </div>
+      {/* Card de cadastro */}
+      <div className="bg-[#11263e] rounded-2xl shadow-lg p-8 w-full max-w-xl flex flex-col items-center">
+        {/* Logo */}
+        <div className="mb-6">
+          <span className="text-4xl font-bold text-green-400">R</span>
         </div>
-
-        <Card className="border-blue-100 shadow-lg">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-gray-800">Cadastro</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Nome Completo *</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="fullName"
-                      name="fullName"
-                      type="text"
-                      placeholder="Seu nome completo"
-                      value={formData.fullName}
-                      onChange={handleChange}
-                      className="pl-10 border-gray-200 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Telefone *</Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    placeholder="(11) 99999-9999"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="border-gray-200 focus:border-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="crp">CRP (opcional)</Label>
-                  <Input
-                    id="crp"
-                    name="crp"
-                    type="text"
-                    placeholder="CRP 01/12345"
-                    value={formData.crp}
-                    onChange={handleChange}
-                    className="border-gray-200 focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="cpfCnpj">CPF/CNPJ *</Label>
-                  <Input
-                    id="cpfCnpj"
-                    name="cpfCnpj"
-                    type="text"
-                    placeholder="000.000.000-00"
-                    value={formData.cpfCnpj}
-                    onChange={handleChange}
-                    className="border-gray-200 focus:border-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">E-mail *</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="pl-10 border-gray-200 focus:border-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="password">Senha *</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="Mínimo 8 caracteres"
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="border-gray-200 focus:border-blue-500"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirmar Senha *</Label>
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    placeholder="Confirme sua senha"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    className="border-gray-200 focus:border-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-2">
-                <input type="checkbox" id="terms" className="mt-1" required />
-                <Label htmlFor="terms" className="text-sm text-gray-600">
-                  Aceito os{' '}
-                  <Link to="/terms" className="text-blue-600 hover:underline">
-                    termos de uso
-                  </Link>{' '}
-                  e{' '}
-                  <Link to="/privacy" className="text-blue-600 hover:underline">
-                    política de privacidade
-                  </Link>
-                </Label>
-              </div>
-
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                Criar Conta
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <p className="text-gray-600">
-                Já tem conta?{' '}
-                <Link to="/login" className="text-blue-600 hover:underline font-semibold">
-                  Faça login aqui
-                </Link>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Título */}
+        <h2 className="text-2xl font-semibold text-white mb-2">Sign up</h2>
+        <p className="text-gray-300 mb-6 text-center">
+          Crie sua conta para começar a gerenciar!
+        </p>
+        {/* Formulário */}
+        <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <Input
+              name="fullName"
+              type="text"
+              placeholder="Nome completo"
+              className="px-4 py-2 rounded-lg bg-[#1a3552] text-white placeholder-gray-400"
+              value={formData.fullName}
+              onChange={handleChange}
+              required
+            />
+            <Input
+              name="phone"
+              type="tel"
+              placeholder="Telefone"
+              className="px-4 py-2 rounded-lg bg-[#1a3552] text-white placeholder-gray-400"
+              value={formData.phone}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <Input
+              name="crp"
+              type="text"
+              placeholder="CRP (opcional)"
+              className="px-4 py-2 rounded-lg bg-[#1a3552] text-white placeholder-gray-400"
+              value={formData.crp}
+              onChange={handleChange}
+            />
+            <Input
+              name="cpfCnpj"
+              type="text"
+              placeholder="CPF/CNPJ"
+              className="px-4 py-2 rounded-lg bg-[#1a3552] text-white placeholder-gray-400"
+              value={formData.cpfCnpj}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          <Input
+            name="email"
+            type="email"
+            placeholder="E-mail"
+            className="px-4 py-2 rounded-lg bg-[#1a3552] text-white placeholder-gray-400"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+          <div className="grid md:grid-cols-2 gap-4">
+            <Input
+              name="password"
+              type="password"
+              placeholder="Senha"
+              className="px-4 py-2 rounded-lg bg-[#1a3552] text-white placeholder-gray-400"
+              value={formData.password}
+              onChange={handleChange}
+              required
+            />
+            <Input
+              name="confirmPassword"
+              type="password"
+              placeholder="Confirmar senha"
+              className="px-4 py-2 rounded-lg bg-[#1a3552] text-white placeholder-gray-400"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          <div className="flex items-start space-x-2">
+            <input type="checkbox" id="terms" className="mt-1 accent-green-400" required />
+            <label htmlFor="terms" className="text-sm text-gray-300">
+              Aceito os{' '}
+              <Link to="/terms" className="text-green-400 hover:underline">
+                termos de uso
+              </Link>{' '}
+              e{' '}
+              <Link to="/privacy" className="text-green-400 hover:underline">
+                política de privacidade
+              </Link>
+            </label>
+          </div>
+          <Button
+            type="submit"
+            className="mt-2 bg-green-400 hover:bg-green-500 text-white font-bold py-2 rounded-lg transition"
+          >
+            Criar Conta
+          </Button>
+        </form>
+        <div className="mt-6 text-center">
+          <p className="text-gray-300">
+            Já tem conta?{' '}
+            <Link to="/login" className="text-green-400 hover:underline font-semibold">
+              Faça login aqui
+            </Link>
+          </p>
+        </div>
+      </div>
+      {/* Onda no rodapé */}
+      <svg
+        className="absolute bottom-0 left-0 w-full"
+        height="80"
+        viewBox="0 0 1440 80"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ minWidth: "100vw" }}
+      >
+        <path
+          d="M0 40C360 80 1080 0 1440 40V80H0V40Z"
+          fill="#18344d"
+        />
+      </svg>
+      <div className="absolute bottom-2 w-full text-center text-gray-400 text-xs">
+        2024 © SuaMarca. Todos os direitos reservados.
       </div>
     </div>
   );

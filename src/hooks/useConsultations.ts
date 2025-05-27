@@ -1,34 +1,20 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
-export const useConsultations = () => {
-  const { user } = useAuth();
-
+export function useConsultations() {
   return useQuery({
-    queryKey: ['consultations', user?.id],
+    queryKey: ['consultations'],
     queryFn: async () => {
-      if (!user) return [];
-      
       const { data, error } = await supabase
         .from('consultations')
-        .select(`
-          *,
-          client:client_id (full_name, phone),
-          specialist:specialist_id (
-            *,
-            profiles:user_id (full_name, crp)
-          )
-        `)
+        .select('*, client:profiles(full_name, phone), specialist:specialists(*)')
         .order('scheduled_date', { ascending: false });
-      
       if (error) throw error;
       return data;
-    },
-    enabled: !!user
+    }
   });
-};
+}
 
 export const useCreateConsultation = () => {
   const queryClient = useQueryClient();

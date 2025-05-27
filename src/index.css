@@ -2,6 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Efeito lamp para navegação ativa */
+.lamp-effect {
+  position: relative;
+  z-index: 1;
+}
+.lamp-effect::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 120%;
+  height: 80%;
+  background: radial-gradient(ellipse at center, rgba(244,114,182,0.25) 0%, rgba(244,114,182,0.10) 60%, transparent 100%);
+  filter: blur(2px);
+  z-index: -1;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  opacity: 1;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -88,6 +109,11 @@
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+  .theme {
+    --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+    --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
+    --animate-pulse: pulse var(--duration) ease-out infinite;
+  }
 }
 
 @layer base {
@@ -97,5 +123,43 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@theme inline {
+  @keyframes shimmer-slide {
+  to {
+    transform: translate(calc(100cqw - 100%), 0);
+    }
+  }
+  @keyframes spin-around {
+  0% {
+    transform: translateZ(0) rotate(0);
+    }
+  15%, 35% {
+    transform: translateZ(0) rotate(90deg);
+    }
+  65%, 85% {
+    transform: translateZ(0) rotate(270deg);
+    }
+  100% {
+    transform: translateZ(0) rotate(360deg);
+    }
+  }
+  @keyframes pulse {
+  0%, 100% {
+    boxShadow: 0 0 0 0 var(--pulse-color);
+    }
+  50% {
+    boxShadow: 0 0 0 8px var(--pulse-color);
+    }
+  }
+  @keyframes pulse {
+  0%, 100% {
+    boxShadow: 0 0 0 0 var(--pulse-color);
+    }
+  50% {
+    boxShadow: 0 0 0 8px var(--pulse-color);
+    }
   }
 }
