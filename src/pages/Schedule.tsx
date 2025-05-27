@@ -1,297 +1,176 @@
+
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { PulsatingButton } from '@/components/magicui/pulsating-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Clock, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useProfile } from '@/hooks/useProfile';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
+import { useCreateConsultation, useScheduleConfig } from '@/hooks/useSchedule';
+import { useNavigate } from 'react-router-dom';
 
 const Schedule = () => {
-  const { user, signOut } = useAuth();
-  const { data: profile } = useProfile();
-  const location = useLocation();
-  const [selectedType, setSelectedType] = useState<'pos-compra' | 'pre-compra' | null>(null);
-  const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTime, setSelectedTime] = useState('');
-  const [description, setDescription] = useState('');
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { data: scheduleConfig } = useScheduleConfig();
+  const createConsultation = useCreateConsultation();
+  
+  const [formData, setFormData] = useState({
+    type: '',
+    scheduled_date: '',
+    scheduled_time: '',
+    description: '',
+  });
 
-  const availableTimes = [
-    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'
-  ];
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Scheduling:', { selectedType, selectedDate, selectedTime, description });
-    // Implementar lógica de agendamento
+    
+    if (!user || !formData.type || !formData.scheduled_date || !formData.scheduled_time) {
+      return;
+    }
+
+    try {
+      await createConsultation.mutateAsync({
+        client_id: user.id,
+        type: formData.type,
+        scheduled_date: formData.scheduled_date,
+        scheduled_time: formData.scheduled_time,
+        description: formData.description,
+      });
+      
+      navigate('/meus-agendamentos');
+    } catch (error) {
+      console.error('Erro ao agendar consulta:', error);
+    }
   };
 
-  const getMinDate = () => {
-    const today = new Date();
-    const minDays = selectedType === 'pos-compra' ? 7 : 3;
-    const minDate = new Date(today.getTime() + minDays * 24 * 60 * 60 * 1000);
-    return minDate.toISOString().split('T')[0];
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  // Gerar horários disponíveis baseado na configuração
+  const generateTimeSlots = () => {
+    const defaultHorarios = [
+      '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+      '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'
+    ];
+    
+    if (scheduleConfig?.horarios) {
+      try {
+        const configHorarios = JSON.parse(scheduleConfig.horarios);
+        return Array.isArray(configHorarios) ? configHorarios : defaultHorarios;
+      } catch {
+        return defaultHorarios;
+      }
+    }
+    
+    return defaultHorarios;
+  };
+
+  const timeSlots = generateTimeSlots();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#7b2ff2] via-[#f357a8] to-[#0a223a] flex flex-col">
-      {/* Navbar */}
-      <nav className="flex items-center justify-between px-10 py-6">
-        <div className="flex items-center gap-2">
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <polygon points="16,2 30,9 30,23 16,30 2,23 2,9" fill="#fff" fillOpacity="0.3" />
-              <polygon points="16,6 26,12 26,20 16,26 6,20 6,12" fill="#fff" fillOpacity="0.7" />
-            </svg>
-          </div>
-          <div>
-            <div className="text-white font-bold text-xl">COMPANY</div>
-            <div className="text-pink-200 text-xs">Slogan line</div>
-          </div>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-2xl mx-auto px-4">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Agendar Consulta</h1>
+          <p className="text-gray-600">Escolha o tipo de consulta e selecione um horário disponível</p>
         </div>
-        {/* Centralizar links principais */}
-        <div className="flex-1 flex justify-center gap-8 items-center text-white font-medium">
-          <Link to="/" className={`hover:text-pink-300 transition ${location.pathname === '/' ? 'lamp-effect' : ''}`}>Home</Link>
-          <Link to="/about" className={`hover:text-pink-300 transition ${location.pathname === '/about' ? 'lamp-effect' : ''}`}>Sobre</Link>
-          <Link to="/contact" className={`hover:text-pink-300 transition ${location.pathname === '/contact' ? 'lamp-effect' : ''}`}>Contato</Link>
-          {user && (
-            <>
-              <Link to="/schedule" className={`hover:text-pink-300 transition ${location.pathname === '/schedule' ? 'lamp-effect' : ''}`}>Agendar</Link>
-              <Link to="/client-area" className={`hover:text-pink-300 transition ${location.pathname === '/client-area' ? 'lamp-effect' : ''}`}>Área do Cliente</Link>
-            </>
-          )}
-        </div>
-        {/* Botão de perfil/menu à direita */}
-        <div className="flex gap-4 items-center">
-          {!user ? (
-            <>
-              <Link to="/auth">
-                <button className="px-4 py-2 rounded-lg bg-white/80 text-pink-500 font-bold hover:bg-white">Login</button>
-              </Link>
-              <Link to="/auth">
-                <button className="px-4 py-2 rounded-lg bg-pink-400 text-white font-bold hover:bg-pink-500">Cadastrar</button>
-              </Link>
-            </>
-          ) :
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <PulsatingButton
-                  pulseColor="#f472b6"
-                  className="bg-white/80 text-pink-500 font-bold hover:bg-white"
-                >
-                  {profile?.full_name || 'Perfil'}
-                </PulsatingButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {profile?.role === 'admin' ? (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin">Painel Administrativo</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
-                  </>
-                ) : (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link to="/client-area">Área do Cliente</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          }
-        </div>
-      </nav>
 
-      <div className="container mx-auto px-4 py-8 flex-1">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-extrabold text-white mb-4 drop-shadow-lg">
-              Agendar Consulta
-            </h1>
-            <p className="text-pink-100 text-lg">
-              Escolha o tipo de atendimento e selecione o melhor horário para você.
-            </p>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-8">
-            {/* Type Selection */}
-            <div className="space-y-6">
-              <Card className="border-pink-100 shadow-lg bg-white/90">
-                <CardHeader>
-                  <CardTitle className="text-pink-500">Tipo de Atendimento</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div
-                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      selectedType === 'pos-compra'
-                        ? 'border-pink-500 bg-pink-50'
-                        : 'border-gray-200 hover:border-pink-300'
-                    }`}
-                    onClick={() => setSelectedType('pos-compra')}
-                  >
-                    <div className="flex items-center mb-2">
-                      <Clock className="h-5 w-5 text-pink-500 mr-2" />
-                      <h3 className="font-semibold text-gray-800">Pós-Compra (15min gratuitos)</h3>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Suporte após sua compra. Disponível a partir de 7 dias após a data de compra.
-                    </p>
-                  </div>
-
-                  <div
-                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      selectedType === 'pre-compra'
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 hover:border-purple-300'
-                    }`}
-                    onClick={() => setSelectedType('pre-compra')}
-                  >
-                    <div className="flex items-center mb-2">
-                      <User className="h-5 w-5 text-purple-500 mr-2" />
-                      <h3 className="font-semibold text-gray-800">Auxílio Pré-Compra</h3>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Orientação antes da compra. Agendamento com 3 dias de antecedência.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {selectedType && (
-                <Card className="border-pink-100 shadow-lg bg-white/90">
-                  <CardHeader>
-                    <CardTitle className="text-pink-500">Descreva sua situação</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Textarea
-                      placeholder={
-                        selectedType === 'pos-compra'
-                          ? 'Descreva suas dúvidas sobre o produto adquirido...'
-                          : 'Conte-nos sobre sua situação e o que você está procurando...'
-                      }
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="min-h-32 border-gray-200 focus:border-pink-500"
-                    />
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Date and Time Selection */}
-            {selectedType && (
-              <div className="space-y-6">
-                <Card className="border-pink-100 shadow-lg bg-white/90">
-                  <CardHeader>
-                    <CardTitle className="flex items-center text-pink-500">
-                      <Calendar className="mr-2 h-5 w-5 text-pink-500" />
-                      Selecionar Data e Horário
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="date">Data</Label>
-                      <input
-                        id="date"
-                        type="date"
-                        min={getMinDate()}
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:border-pink-500"
-                      />
-                    </div>
-
-                    {selectedDate && (
-                      <div className="space-y-2">
-                        <Label>Horários Disponíveis</Label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {availableTimes.map((time) => (
-                            <button
-                              key={time}
-                              type="button"
-                              onClick={() => setSelectedTime(time)}
-                              className={`p-2 text-sm border rounded transition-all ${
-                                selectedTime === time
-                                  ? 'border-pink-500 bg-pink-50 text-pink-700'
-                                  : 'border-gray-200 hover:border-pink-300'
-                              }`}
-                            >
-                              {time}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {selectedDate && selectedTime && (
-                  <Card className="border-purple-100 shadow-lg bg-white/90">
-                    <CardHeader>
-                      <CardTitle className="text-purple-500">Resumo do Agendamento</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Tipo:</span>
-                        <span className="font-medium">
-                          {selectedType === 'pos-compra' ? 'Pós-Compra' : 'Auxílio Pré-Compra'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Data:</span>
-                        <span className="font-medium">
-                          {new Date(selectedDate).toLocaleDateString('pt-BR')}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Horário:</span>
-                        <span className="font-medium">{selectedTime}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Duração:</span>
-                        <span className="font-medium">
-                          {selectedType === 'pos-compra' ? '15 minutos' : '30 minutos'}
-                        </span>
-                      </div>
-                      
-                      <Button 
-                        onClick={handleSubmit}
-                        className="w-full bg-purple-600 hover:bg-purple-700 mt-4"
-                      >
-                        Confirmar Agendamento
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Calendar className="mr-2 h-5 w-5" />
+              Nova Consulta
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Tipo de Consulta */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Tipo de Consulta</label>
+                <Select value={formData.type} onValueChange={(value) => handleChange('type', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo de consulta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pre-compra">Pré-venda - Orientação antes da compra</SelectItem>
+                    <SelectItem value="pos-compra">Pós-venda - Suporte após a compra</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* Nuvens rodapé */}
-      <div className="w-full h-32 relative">
-        <svg className="absolute bottom-0 left-0 w-full" height="100" viewBox="0 0 1440 100" fill="none">
-          <path
-            d="M0 40C360 80 1080 0 1440 40V100H0V40Z"
-            fill="#fff"
-            fillOpacity="0.7"
-          />
-        </svg>
+              {/* Data */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Data da Consulta</label>
+                <Input
+                  type="date"
+                  value={formData.scheduled_date}
+                  onChange={(e) => handleChange('scheduled_date', e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+
+              {/* Horário */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Horário</label>
+                <Select value={formData.scheduled_time} onValueChange={(value) => handleChange('scheduled_time', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um horário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeSlots.map((time) => (
+                      <SelectItem key={time} value={time}>
+                        <div className="flex items-center">
+                          <Clock className="mr-2 h-4 w-4" />
+                          {time}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Descrição */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Descrição</label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => handleChange('description', e.target.value)}
+                  placeholder="Descreva brevemente o motivo da consulta ou dúvidas específicas..."
+                  rows={4}
+                />
+              </div>
+
+              {/* Informações do usuário */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center mb-2">
+                  <User className="mr-2 h-4 w-4" />
+                  <span className="font-medium">Seus dados para a consulta:</span>
+                </div>
+                <p className="text-sm text-gray-600">
+                  A consulta será agendada com as informações do seu perfil cadastrado.
+                  Certifique-se de que seus dados estão atualizados.
+                </p>
+              </div>
+
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={createConsultation.isPending || !formData.type || !formData.scheduled_date || !formData.scheduled_time}
+              >
+                {createConsultation.isPending ? 'Agendando...' : 'Agendar Consulta'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <div className="mt-6 text-center">
+          <Button variant="outline" onClick={() => navigate('/meus-agendamentos')}>
+            Ver Meus Agendamentos
+          </Button>
+        </div>
       </div>
     </div>
   );
