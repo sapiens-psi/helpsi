@@ -9,6 +9,38 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_logs: {
+        Row: {
+          action: string
+          admin_id: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+        }
+        Insert: {
+          action: string
+          admin_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+        }
+        Update: {
+          action?: string
+          admin_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_logs_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           consultation_id: string | null
@@ -48,9 +80,82 @@ export type Database = {
           },
         ]
       }
+      company_documents: {
+        Row: {
+          company_id: string | null
+          id: string
+          name: string
+          uploaded_at: string | null
+          url: string
+        }
+        Insert: {
+          company_id?: string | null
+          id?: string
+          name: string
+          uploaded_at?: string | null
+          url: string
+        }
+        Update: {
+          company_id?: string | null
+          id?: string
+          name?: string
+          uploaded_at?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_profile"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_profile: {
+        Row: {
+          address: string | null
+          cnpj: string | null
+          created_at: string | null
+          description: string | null
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          site: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          cnpj?: string | null
+          created_at?: string | null
+          description?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          site?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          cnpj?: string | null
+          created_at?: string | null
+          description?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          site?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       consultations: {
         Row: {
           client_id: string | null
+          coupon_code_used: string | null
+          coupon_id: string | null
           created_at: string | null
           description: string | null
           duration_minutes: number | null
@@ -68,6 +173,8 @@ export type Database = {
         }
         Insert: {
           client_id?: string | null
+          coupon_code_used?: string | null
+          coupon_id?: string | null
           created_at?: string | null
           description?: string | null
           duration_minutes?: number | null
@@ -85,6 +192,8 @@ export type Database = {
         }
         Update: {
           client_id?: string | null
+          coupon_code_used?: string | null
+          coupon_id?: string | null
           created_at?: string | null
           description?: string | null
           duration_minutes?: number | null
@@ -109,6 +218,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "consultations_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "consultations_specialist_id_fkey"
             columns: ["specialist_id"]
             isOneToOne: false
@@ -117,33 +233,96 @@ export type Database = {
           },
         ]
       }
+      coupons: {
+        Row: {
+          code: string
+          created_at: string
+          current_usage_count: number
+          discount_type: string | null
+          expires_at: string | null
+          id: string
+          individual_usage_limit: number
+          is_active: boolean
+          min_purchase_amount: number
+          type: string
+          updated_at: string
+          usage_limit: number | null
+          value: number | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          current_usage_count?: number
+          discount_type?: string | null
+          expires_at?: string | null
+          id?: string
+          individual_usage_limit?: number
+          is_active?: boolean
+          min_purchase_amount?: number
+          type: string
+          updated_at?: string
+          usage_limit?: number | null
+          value?: number | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          current_usage_count?: number
+          discount_type?: string | null
+          expires_at?: string | null
+          id?: string
+          individual_usage_limit?: number
+          is_active?: boolean
+          min_purchase_amount?: number
+          type?: string
+          updated_at?: string
+          usage_limit?: number | null
+          value?: number | null
+        }
+        Relationships: []
+      }
       meeting_rooms: {
         Row: {
           consultation_id: string | null
           created_at: string | null
+          created_manually: boolean | null
+          description: string | null
           ended_at: string | null
           id: string
           is_active: boolean | null
+          name: string | null
           room_token: string
+          scheduled_at: string | null
           started_at: string | null
+          type: string | null
         }
         Insert: {
           consultation_id?: string | null
           created_at?: string | null
+          created_manually?: boolean | null
+          description?: string | null
           ended_at?: string | null
           id?: string
           is_active?: boolean | null
+          name?: string | null
           room_token: string
+          scheduled_at?: string | null
           started_at?: string | null
+          type?: string | null
         }
         Update: {
           consultation_id?: string | null
           created_at?: string | null
+          created_manually?: boolean | null
+          description?: string | null
           ended_at?: string | null
           id?: string
           is_active?: boolean | null
+          name?: string | null
           room_token?: string
+          scheduled_at?: string | null
           started_at?: string | null
+          type?: string | null
         }
         Relationships: [
           {
@@ -184,6 +363,42 @@ export type Database = {
           id?: string
           phone?: string
           role?: Database["public"]["Enums"]["user_role"] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      schedule_config: {
+        Row: {
+          business_hours: Json | null
+          created_at: string | null
+          diasSemana: Json | null
+          duracaoConsulta: number | null
+          holidays: Json | null
+          horarios: Json | null
+          id: string
+          intervaloEntreConsultas: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          business_hours?: Json | null
+          created_at?: string | null
+          diasSemana?: Json | null
+          duracaoConsulta?: number | null
+          holidays?: Json | null
+          horarios?: Json | null
+          id?: string
+          intervaloEntreConsultas?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          business_hours?: Json | null
+          created_at?: string | null
+          diasSemana?: Json | null
+          duracaoConsulta?: number | null
+          holidays?: Json | null
+          horarios?: Json | null
+          id?: string
+          intervaloEntreConsultas?: number | null
           updated_at?: string | null
         }
         Relationships: []
@@ -264,69 +479,6 @@ export type Database = {
           },
         ]
       }
-      company_profile: {
-        Row: {
-          id: string
-          name: string
-          cnpj: string | null
-          email: string | null
-          phone: string | null
-          address: string | null
-          description: string | null
-          site: string | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          name: string
-          cnpj?: string | null
-          email?: string | null
-          phone?: string | null
-          address?: string | null
-          description?: string | null
-          site?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          name?: string
-          cnpj?: string | null
-          email?: string | null
-          phone?: string | null
-          address?: string | null
-          description?: string | null
-          site?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      },
-      schedule_config: {
-        Row: {
-          id: string
-          business_hours: Json | null
-          holidays: Json | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          business_hours?: Json | null
-          holidays?: Json | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          business_hours?: Json | null
-          holidays?: Json | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      },
     }
     Views: {
       [_ in never]: never
