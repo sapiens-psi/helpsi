@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,9 +65,21 @@ const ConfigAgenda = () => {
       if (data) {
         const safeConfig: ConfigAgendaType = {
           id: data.id,
-          diasSemana: typeof data.diasSemana === 'object' && data.diasSemana !== null ? data.diasSemana : defaultConfig.diasSemana,
-          horarios: typeof data.horarios === 'object' && data.horarios !== null ? data.horarios : defaultConfig.horarios,
-          business_hours: typeof data.business_hours === 'object' && data.business_hours !== null ? data.business_hours : defaultConfig.business_hours,
+          diasSemana: data.diasSemana ? 
+            (typeof data.diasSemana === 'object' && data.diasSemana !== null ? 
+              JSON.parse(typeof data.diasSemana === 'string' ? data.diasSemana : JSON.stringify(data.diasSemana)) : 
+              defaultConfig.diasSemana) : 
+            defaultConfig.diasSemana,
+          horarios: data.horarios ? 
+            (typeof data.horarios === 'object' && data.horarios !== null ? 
+              JSON.parse(typeof data.horarios === 'string' ? data.horarios : JSON.stringify(data.horarios)) : 
+              defaultConfig.horarios) : 
+            defaultConfig.horarios,
+          business_hours: data.business_hours ? 
+            (typeof data.business_hours === 'object' && data.business_hours !== null ? 
+              JSON.parse(typeof data.business_hours === 'string' ? data.business_hours : JSON.stringify(data.business_hours)) : 
+              defaultConfig.business_hours) : 
+            defaultConfig.business_hours,
           duracaoConsulta: typeof data.duracaoConsulta === 'number' ? data.duracaoConsulta : defaultConfig.duracaoConsulta,
           intervaloEntreConsultas: typeof data.intervaloEntreConsultas === 'number' ? data.intervaloEntreConsultas : defaultConfig.intervaloEntreConsultas
         };
