@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -10,13 +9,22 @@ import {
   Calendar,
   UserCheck,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Home,
+  LogOut,
+  BarChart,
+  CreditCard,
+  Percent,
+  Ticket
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 
 const AdminSidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
+  const { signOut } = useAuth();
 
   const menuItems = [
     { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
@@ -27,7 +35,9 @@ const AdminSidebar = () => {
     { path: '/admin/config-agenda', icon: Settings, label: 'Config. Agenda' },
     { path: '/admin/agenda-pos-venda', icon: Calendar, label: 'Agenda Pós-venda' },
     { path: '/admin/agenda-pre-venda', icon: Calendar, label: 'Agenda Pré-venda' },
-    { path: '/admin/clientes', icon: Users, label: 'Clientes' }
+    { path: '/admin/clientes', icon: Users, label: 'Clientes' },
+    { path: '/admin/discount-coupons', icon: Percent, label: 'Cupons de Desconto' },
+    { path: '/admin/validation-coupons', icon: Ticket, label: 'Cupons de Validação' }
   ];
 
   const isActive = (path: string, exact = false) => {
@@ -79,6 +89,34 @@ const AdminSidebar = () => {
           );
         })}
       </nav>
+
+      {/* Botão Voltar à Página Principal no rodapé do sidebar */}
+      <div className="p-4 border-t border-gray-200 mt-auto">
+        <NavLink
+          to="/"
+          className={cn(
+            "flex items-center px-3 py-2 rounded-lg transition-colors",
+            "text-gray-600 hover:bg-gray-50",
+            isCollapsed && "justify-center"
+          )}
+        >
+          <Home size={20} />
+          {!isCollapsed && <span className="ml-3">Voltar à Página Principal</span>}
+        </NavLink>
+
+        {/* Botão Sair no rodapé do sidebar */}
+        <Button 
+          variant="outline" 
+          className={cn(
+            "w-full justify-start text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700",
+            isCollapsed && "justify-center"
+          )}
+          onClick={signOut}
+        >
+          <LogOut size={20} className={isCollapsed ? "" : "mr-3"} />
+          {!isCollapsed && <span>Sair</span>}
+        </Button>
+      </div>
     </div>
   );
 };

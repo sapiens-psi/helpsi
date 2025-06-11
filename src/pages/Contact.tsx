@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
+import logo from '@/assets/helpsilogo.png';
 
 const Contact = () => {
   const { user, signOut } = useAuth();
@@ -33,15 +34,8 @@ const Contact = () => {
       {/* Navbar */}
       <nav className="flex items-center justify-between px-10 py-6">
         <div className="flex items-center gap-2">
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <polygon points="16,2 30,9 30,23 16,30 2,23 2,9" fill="#fff" fillOpacity="0.3" />
-              <polygon points="16,6 26,12 26,20 16,26 6,20 6,12" fill="#fff" fillOpacity="0.7" />
-            </svg>
-          </div>
-          <div>
-            <div className="text-white font-bold text-xl">COMPANY</div>
-            <div className="text-pink-200 text-xs">Slogan line</div>
+          <div className="flex items-center justify-center">
+            <img src={logo} alt="Helpsi Logo" className="h-16 w-auto" />
           </div>
         </div>
         {/* Centralizar links principais */}

@@ -1,11 +1,12 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, User, Clock, Mail } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const AdminPanel = () => {
+  const navigate = useNavigate();
   const [specialists] = useState([
     {
       id: 1,
@@ -59,9 +60,6 @@ const AdminPanel = () => {
       <header className="bg-white/80 backdrop-blur-md border-b border-blue-100">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-blue-600">Painel Administrativo</h1>
-          <Button variant="outline" className="border-blue-200 text-blue-600">
-            Sair
-          </Button>
         </div>
       </header>
 

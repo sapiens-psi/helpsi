@@ -5,9 +5,11 @@ import { PulsatingButton } from '@/components/magicui/pulsating-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar, Clock, User } from 'lucide-react';
+import { Calendar, Clock, User, Ticket } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
+import { useCreateConsultation } from '@/hooks/useSchedule';
+import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -15,6 +17,23 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
+import logo from '@/assets/helpsilogo.png';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+interface Coupon {
+  id: string;
+  code: string;
+  type: 'discount' | 'validation';
+  discount_type: 'percentage' | 'fixed_amount' | null;
+  value: number;
+  is_active: boolean;
+  expires_at: string | null;
+  usage_limit: number | null;
+  current_usage_count: number;
+  individual_usage_limit: number;
+  min_purchase_amount: number;
+}
 
 const Schedule = () => {
   const { user, signOut } = useAuth();
@@ -24,16 +43,113 @@ const Schedule = () => {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [description, setDescription] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [validatedCoupon, setValidatedCoupon] = useState<Coupon | null>(null);
+  const [isCouponValidating, setIsCouponValidating] = useState(false);
+
+  const { mutateAsync: createConsultation, isPending: isScheduling } = useCreateConsultation();
+
+  const queryClient = useQueryClient();
+
+  const validateCouponMutation = useMutation<Coupon, Error, string>({
+    mutationFn: async (code) => {
+      setIsCouponValidating(true);
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', code.toUpperCase())
+        .single();
+
+      if (error) {
+        throw new Error('Cupom inválido ou não encontrado.');
+      }
+      if (!data.is_active) {
+        throw new Error('Cupom inativo.');
+      }
+      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        throw new Error('Cupom expirado.');
+      }
+      if (data.usage_limit !== null && data.current_usage_count >= data.usage_limit) {
+        throw new Error('Cupom esgotado.');
+      }
+
+      // Check individual usage limit (if applicable, for future)
+      // This requires tracking user's past coupon usage, which is not implemented yet.
+      // For now, validation coupons have individual_usage_limit: 1 set in DB schema.
+      // Discount coupons could have higher.
+
+      return data as Coupon;
+    },
+    onSuccess: (data) => {
+      setValidatedCoupon(data);
+      toast.success(`Cupom \'${data.code}\' validado com sucesso!`);
+    },
+    onError: (err: any) => {
+      setValidatedCoupon(null);
+      toast.error('Erro ao validar cupom: ' + err.message);
+    },
+    onSettled: () => {
+      setIsCouponValidating(false);
+    }
+  });
 
   const availableTimes = [
     '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
     '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleApplyCoupon = () => {
+    if (couponCode) {
+      validateCouponMutation.mutate(couponCode);
+    } else {
+      toast.error('Por favor, insira um código de cupom.');
+      setValidatedCoupon(null); // Clear any previously validated coupon
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Scheduling:', { selectedType, selectedDate, selectedTime, description });
-    // Implementar lógica de agendamento
+    if (!selectedType || !selectedDate || !selectedTime || !user?.id) {
+      toast.error('Por favor, preencha todos os campos obrigatórios.');
+      return;
+    }
+
+    let duration = selectedType === 'pos-compra' ? 15 : 30;
+    let finalCouponCode = validatedCoupon?.code || null;
+    let finalCouponId = validatedCoupon?.id || null;
+
+    if (validatedCoupon && validatedCoupon.type === 'validation' && selectedType === 'pos-compra') {
+      duration = 15; // Ensure 15 minutes for validation coupons on pos-compra
+      toast.info('Cupom de validação aplicado: consulta de 15 minutos gratuita.');
+    } else if (validatedCoupon && validatedCoupon.type === 'discount') {
+      // Implement discount logic here for pricing.
+      // For now, just a placeholder. The current system assumes consultations have fixed prices.
+      // If prices become dynamic, this is where discount calculations would happen.
+      toast.info(`Cupom de desconto aplicado: ${validatedCoupon.value}${validatedCoupon.discount_type === 'percentage' ? '%' : ' R$'}.`);
+    }
+
+    try {
+      await createConsultation({
+        client_id: user.id,
+        type: selectedType,
+        scheduled_date: selectedDate,
+        scheduled_time: selectedTime,
+        description,
+        duration_minutes: duration,
+        coupon_code_used: finalCouponCode,
+        coupon_id: finalCouponId
+      });
+      toast.success('Agendamento realizado com sucesso!');
+      // Limpar formulário após agendamento
+      setSelectedType(null);
+      setSelectedDate('');
+      setSelectedTime('');
+      setDescription('');
+      setCouponCode('');
+      setValidatedCoupon(null);
+    } catch (error: any) {
+      toast.error('Erro ao agendar consulta: ' + (error.message || 'Verifique sua conexão ou tente novamente.'));
+    }
   };
 
   const getMinDate = () => {
@@ -48,15 +164,8 @@ const Schedule = () => {
       {/* Navbar */}
       <nav className="flex items-center justify-between px-10 py-6">
         <div className="flex items-center gap-2">
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <polygon points="16,2 30,9 30,23 16,30 2,23 2,9" fill="#fff" fillOpacity="0.3" />
-              <polygon points="16,6 26,12 26,20 16,26 6,20 6,12" fill="#fff" fillOpacity="0.7" />
-            </svg>
-          </div>
-          <div>
-            <div className="text-white font-bold text-xl">COMPANY</div>
-            <div className="text-pink-200 text-xs">Slogan line</div>
+          <div className="flex items-center justify-center">
+            <img src={logo} alt="Helpsi Logo" className="h-16 w-auto" />
           </div>
         </div>
         {/* Centralizar links principais */}
@@ -192,6 +301,46 @@ const Schedule = () => {
               )}
             </div>
 
+            {/* Coupon Section */}
+            <Card className="border-blue-100 shadow-lg bg-white/90">
+              <CardHeader>
+                <CardTitle className="flex items-center text-blue-500">
+                  <Ticket className="mr-2 h-5 w-5 text-blue-500" />
+                  Possui um Cupom?
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="couponCode">Código do Cupom</Label>
+                  <Input
+                    id="couponCode"
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    placeholder="Digite seu cupom aqui"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <Button 
+                  onClick={handleApplyCoupon}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  disabled={isCouponValidating}
+                >
+                  {isCouponValidating ? 'Validando...' : 'Aplicar Cupom'}
+                </Button>
+                {validatedCoupon && (
+                  <div className="mt-4 p-3 bg-green-50 text-green-700 border border-green-200 rounded-md">
+                    Cupom \'{validatedCoupon.code}\' aplicado! {validatedCoupon.type === 'validation' ? 'Ganhe 15 minutos gratuitos.' : `Desconto de ${validatedCoupon.value}${validatedCoupon.discount_type === 'percentage' ? '%' : ' R$'}.`}
+                  </div>
+                )}
+                {validatedCoupon === null && couponCode !== '' && !isCouponValidating && (
+                  <div className="mt-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-md">
+                    Cupom inválido ou não aplicável.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Date and Time Selection */}
             {selectedType && (
               <div className="space-y-6">
@@ -271,14 +420,21 @@ const Schedule = () => {
                       <Button 
                         onClick={handleSubmit}
                         className="w-full bg-purple-600 hover:bg-purple-700 mt-4"
+                        disabled={isScheduling}
                       >
-                        Confirmar Agendamento
+                        {isScheduling ? 'Agendando...' : 'Confirmar Agendamento'}
                       </Button>
                     </CardContent>
                   </Card>
                 )}
               </div>
             )}
+          </div>
+
+          <div className="flex-1 flex justify-center items-center">
+            <div className="relative w-full max-w-md h-auto">
+              <img src={logo} alt="Helpsi Logo" className="h-16 w-auto mx-auto" />
+            </div>
           </div>
         </div>
       </div>
