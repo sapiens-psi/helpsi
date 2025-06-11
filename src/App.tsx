@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -28,6 +29,8 @@ import ConfigAgenda from "./pages/admin/ConfigAgenda";
 import AgendaPosVenda from "./pages/admin/AgendaPosVenda";
 import AgendaPreVenda from "./pages/admin/AgendaPreVenda";
 import Clientes from "./pages/admin/Clientes";
+import DiscountCoupons from "./pages/admin/DiscountCoupons";
+import ValidationCoupons from "./pages/admin/ValidationCoupons";
 
 const queryClient = new QueryClient();
 
@@ -96,6 +99,8 @@ const App = () => (
               <Route path="agenda-pos-venda" element={<AgendaPosVenda />} />
               <Route path="agenda-pre-venda" element={<AgendaPreVenda />} />
               <Route path="clientes" element={<Clientes />} />
+              <Route path="discount-coupons" element={<DiscountCoupons />} />
+              <Route path="validation-coupons" element={<ValidationCoupons />} />
             </Route>
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

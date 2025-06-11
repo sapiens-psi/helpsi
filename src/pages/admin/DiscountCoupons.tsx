@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,10 +12,14 @@ import { toast } from 'sonner';
 import type { Coupon } from '@/types/supabase';
 
 const DiscountCoupons = () => {
-  const { data: coupons, isLoading, error } = useDiscountCoupons();
+  console.log('DiscountCoupons component rendering');
+  
+  const { data: coupons, isLoading, error, isError } = useDiscountCoupons();
   const createCoupon = useCreateCoupon();
   const updateCoupon = useUpdateCoupon();
   const deleteCoupon = useDeleteCoupon();
+
+  console.log('Discount coupons data:', { coupons, isLoading, error, isError });
 
   const [newCoupon, setNewCoupon] = useState({
     code: '',
@@ -31,7 +35,13 @@ const DiscountCoupons = () => {
 
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
 
+  useEffect(() => {
+    console.log('DiscountCoupons mounted');
+  }, []);
+
   const handleCreateCoupon = async () => {
+    console.log('Creating coupon:', newCoupon);
+    
     if (!newCoupon.code || !newCoupon.discount_type || newCoupon.value <= 0) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
@@ -61,8 +71,11 @@ const DiscountCoupons = () => {
         individual_usage_limit: 1,
         min_purchase_amount: 0,
       });
+
+      toast.success('Cupom criado com sucesso!');
     } catch (error) {
       console.error('Erro ao criar cupom:', error);
+      toast.error('Erro ao criar cupom');
     }
   };
 
@@ -70,8 +83,10 @@ const DiscountCoupons = () => {
     try {
       await updateCoupon.mutateAsync(coupon);
       setEditingCoupon(null);
+      toast.success('Cupom atualizado com sucesso!');
     } catch (error) {
       console.error('Erro ao atualizar cupom:', error);
+      toast.error('Erro ao atualizar cupom');
     }
   };
 
@@ -79,13 +94,16 @@ const DiscountCoupons = () => {
     if (window.confirm('Tem certeza que deseja excluir este cupom?')) {
       try {
         await deleteCoupon.mutateAsync({ id, type: 'discount' });
+        toast.success('Cupom excluído com sucesso!');
       } catch (error) {
         console.error('Erro ao excluir cupom:', error);
+        toast.error('Erro ao excluir cupom');
       }
     }
   };
 
   if (isLoading) {
+    console.log('Loading discount coupons...');
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -96,15 +114,18 @@ const DiscountCoupons = () => {
     );
   }
 
-  if (error) {
+  if (isError || error) {
+    console.error('Error loading discount coupons:', error);
     return (
       <div className="p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">Erro ao carregar cupons: {error.message}</p>
+          <p className="text-red-800">Erro ao carregar cupons: {error?.message || 'Erro desconhecido'}</p>
         </div>
       </div>
     );
   }
+
+  console.log('Rendering discount coupons page with data:', coupons);
 
   return (
     <div className="space-y-6 p-6">

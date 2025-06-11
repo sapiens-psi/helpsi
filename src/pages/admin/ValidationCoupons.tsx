@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,10 +11,14 @@ import { toast } from 'sonner';
 import type { Coupon } from '@/types/supabase';
 
 const ValidationCoupons = () => {
-  const { data: coupons, isLoading, error } = useValidationCoupons();
+  console.log('ValidationCoupons component rendering');
+  
+  const { data: coupons, isLoading, error, isError } = useValidationCoupons();
   const createCoupon = useCreateCoupon();
   const updateCoupon = useUpdateCoupon();
   const deleteCoupon = useDeleteCoupon();
+
+  console.log('Validation coupons data:', { coupons, isLoading, error, isError });
 
   const [newCoupon, setNewCoupon] = useState({
     code: '',
@@ -27,7 +31,13 @@ const ValidationCoupons = () => {
 
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
 
+  useEffect(() => {
+    console.log('ValidationCoupons mounted');
+  }, []);
+
   const handleCreateCoupon = async () => {
+    console.log('Creating validation coupon:', newCoupon);
+    
     if (!newCoupon.code) {
       toast.error('O código do cupom é obrigatório');
       return;
@@ -54,8 +64,11 @@ const ValidationCoupons = () => {
         usage_limit: '',
         individual_usage_limit: 1,
       });
+
+      toast.success('Cupom de validação criado com sucesso!');
     } catch (error) {
       console.error('Erro ao criar cupom:', error);
+      toast.error('Erro ao criar cupom de validação');
     }
   };
 
@@ -63,8 +76,10 @@ const ValidationCoupons = () => {
     try {
       await updateCoupon.mutateAsync(coupon);
       setEditingCoupon(null);
+      toast.success('Cupom atualizado com sucesso!');
     } catch (error) {
       console.error('Erro ao atualizar cupom:', error);
+      toast.error('Erro ao atualizar cupom');
     }
   };
 
@@ -72,13 +87,16 @@ const ValidationCoupons = () => {
     if (window.confirm('Tem certeza que deseja excluir este cupom?')) {
       try {
         await deleteCoupon.mutateAsync({ id, type: 'validation' });
+        toast.success('Cupom excluído com sucesso!');
       } catch (error) {
         console.error('Erro ao excluir cupom:', error);
+        toast.error('Erro ao excluir cupom');
       }
     }
   };
 
   if (isLoading) {
+    console.log('Loading validation coupons...');
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -89,15 +107,18 @@ const ValidationCoupons = () => {
     );
   }
 
-  if (error) {
+  if (isError || error) {
+    console.error('Error loading validation coupons:', error);
     return (
       <div className="p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">Erro ao carregar cupons: {error.message}</p>
+          <p className="text-red-800">Erro ao carregar cupons: {error?.message || 'Erro desconhecido'}</p>
         </div>
       </div>
     );
   }
+
+  console.log('Rendering validation coupons page with data:', coupons);
 
   return (
     <div className="space-y-6 p-6">
