@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -127,19 +128,8 @@ const SalasPreVenda = () => {
                     <div className="space-x-2">
                       <Button 
                         onClick={() => navigate(`/conference/${room.id}`)}
-                        disabled={(() => {
-                          const now = new Date();
-                          const scheduledTime = room.scheduled_at ? new Date(room.scheduled_at) : null;
-                          const fiveMinutesBefore = scheduledTime ? new Date(scheduledTime.getTime() - 5 * 60 * 1000) : null;
-                          const isAccessibleByTime = scheduledTime && fiveMinutesBefore ? (now >= fiveMinutesBefore && now <= scheduledTime) : true; // Se não tem horário, considera sempre acessível por tempo
-                          return !room.is_active || !isAccessibleByTime;
-                        })()} // Desativa o botão se a sala não estiver ativa ou não for acessível por tempo
-                        className={!room.is_active || !((() => {
-                          const now = new Date();
-                          const scheduledTime = room.scheduled_at ? new Date(room.scheduled_at) : null;
-                          const fiveMinutesBefore = scheduledTime ? new Date(scheduledTime.getTime() - 5 * 60 * 1000) : null;
-                          return scheduledTime && fiveMinutesBefore ? (now >= fiveMinutesBefore && now <= scheduledTime) : true;
-                        })()) ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed' : ''} // Estilo cinza
+                        disabled={!room.is_active}
+                        className={!room.is_active ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed' : ''}
                       >
                         <VideoIcon className="mr-2 h-4 w-4" />
                         Acessar Sala
