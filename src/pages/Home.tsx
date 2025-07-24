@@ -71,6 +71,14 @@ const Home = () => {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
                   </>
+                ) : profile?.role === 'specialist' ? (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link to="/specialist/agenda">Painel do Especialista</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
+                  </>
                 ) : (
                   <>
                     <DropdownMenuItem asChild>

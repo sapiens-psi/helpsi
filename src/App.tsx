@@ -5,8 +5,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import AdminLayout from "@/layouts/AdminLayout";
+import AdminLayout from '@/layouts/AdminLayout';
+import SpecialistLayout from '@/layouts/SpecialistLayout';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
 import Login from "./pages/Login";
@@ -31,6 +32,11 @@ import AgendaPreVenda from "./pages/admin/AgendaPreVenda";
 import Clientes from "./pages/admin/Clientes";
 import DiscountCoupons from "./pages/admin/DiscountCoupons";
 import ValidationCoupons from "./pages/admin/ValidationCoupons";
+
+// Specialist Pages
+import SpecialistAgenda from "./pages/specialist/SpecialistAgenda";
+import SpecialistPDFs from "./pages/specialist/SpecialistPDFs";
+import SpecialistRecordings from "./pages/specialist/SpecialistRecordings";
 
 const queryClient = new QueryClient();
 
@@ -101,6 +107,20 @@ const App = () => (
               <Route path="clientes" element={<Clientes />} />
               <Route path="discount-coupons" element={<DiscountCoupons />} />
               <Route path="validation-coupons" element={<ValidationCoupons />} />
+            </Route>
+            {/* Specialist Routes */}
+            <Route 
+              path="/specialist/*" 
+              element={
+                <ProtectedRoute requiredRole="specialist">
+                  <SpecialistLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<SpecialistAgenda />} />
+              <Route path="agenda" element={<SpecialistAgenda />} />
+              <Route path="pdfs" element={<SpecialistPDFs />} />
+              <Route path="recordings" element={<SpecialistRecordings />} />
             </Route>
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
