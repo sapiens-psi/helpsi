@@ -68,7 +68,7 @@ export const useCreateSpecialist = () => {
 
       // 4. Criar configuração padrão de horários
       await supabase.rpc('create_default_specialist_schedule', {
-        p_specialist_id: specialistData.id
+        p_specialist_id: authData.user.id // Usar user_id em vez do specialist.id
       });
 
       return specialistData;
