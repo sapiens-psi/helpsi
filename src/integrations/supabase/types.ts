@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instanciate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.12 (cd3cf9e)"
+  }
   public: {
     Tables: {
       admin_logs: {
@@ -281,6 +286,61 @@ export type Database = {
         }
         Relationships: []
       }
+      free_sessions: {
+        Row: {
+          consultation_id: string | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          pdf_material_id: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          consultation_id?: string | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          pdf_material_id: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          consultation_id?: string | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          pdf_material_id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "free_sessions_consultation_id_fkey"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "consultations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "free_sessions_pdf_material_id_fkey"
+            columns: ["pdf_material_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "free_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_rooms: {
         Row: {
           consultation_id: string | null
@@ -334,11 +394,94 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          action_label: string | null
+          action_url: string | null
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          metadata: Json | null
+          title: string
+          type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          action_label?: string | null
+          action_url?: string | null
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          metadata?: Json | null
+          title: string
+          type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          action_label?: string | null
+          action_url?: string | null
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          metadata?: Json | null
+          title?: string
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pdf_materials: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          file_size: number
+          file_type: string
+          file_url: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          file_size?: number
+          file_type?: string
+          file_url: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          file_size?: number
+          file_type?: string
+          file_url?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          cidade: string | null
           cpf_cnpj: string
           created_at: string | null
           crp: string | null
+          estado: string | null
           full_name: string
           id: string
           phone: string
@@ -346,9 +489,11 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          cidade?: string | null
           cpf_cnpj: string
           created_at?: string | null
           crp?: string | null
+          estado?: string | null
           full_name: string
           id: string
           phone: string
@@ -356,9 +501,11 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          cidade?: string | null
           cpf_cnpj?: string
           created_at?: string | null
           crp?: string | null
+          estado?: string | null
           full_name?: string
           id?: string
           phone?: string
@@ -402,6 +549,171 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      schedule_prices: {
+        Row: {
+          id: number
+          posvenda: Json | null
+          prevenda: Json | null
+        }
+        Insert: {
+          id?: number
+          posvenda?: Json | null
+          prevenda?: Json | null
+        }
+        Update: {
+          id?: number
+          posvenda?: Json | null
+          prevenda?: Json | null
+        }
+        Relationships: []
+      }
+      specialist_general_config: {
+        Row: {
+          advance_booking_days: number | null
+          allow_weekend_bookings: boolean | null
+          auto_confirm_bookings: boolean | null
+          created_at: string | null
+          id: string
+          min_advance_hours: number | null
+          reminder_hours_before: number | null
+          send_reminder_emails: boolean | null
+          specialist_id: string
+          timezone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          advance_booking_days?: number | null
+          allow_weekend_bookings?: boolean | null
+          auto_confirm_bookings?: boolean | null
+          created_at?: string | null
+          id?: string
+          min_advance_hours?: number | null
+          reminder_hours_before?: number | null
+          send_reminder_emails?: boolean | null
+          specialist_id: string
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          advance_booking_days?: number | null
+          allow_weekend_bookings?: boolean | null
+          auto_confirm_bookings?: boolean | null
+          created_at?: string | null
+          id?: string
+          min_advance_hours?: number | null
+          reminder_hours_before?: number | null
+          send_reminder_emails?: boolean | null
+          specialist_id?: string
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "specialist_general_config_specialist_id_fkey"
+            columns: ["specialist_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      specialist_schedule_blocks: {
+        Row: {
+          block_date: string
+          created_at: string | null
+          end_time: string | null
+          id: string
+          is_full_day: boolean | null
+          reason: string | null
+          specialist_id: string
+          start_time: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          block_date: string
+          created_at?: string | null
+          end_time?: string | null
+          id?: string
+          is_full_day?: boolean | null
+          reason?: string | null
+          specialist_id: string
+          start_time?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          block_date?: string
+          created_at?: string | null
+          end_time?: string | null
+          id?: string
+          is_full_day?: boolean | null
+          reason?: string | null
+          specialist_id?: string
+          start_time?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "specialist_schedule_blocks_specialist_id_fkey"
+            columns: ["specialist_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      specialist_schedule_config: {
+        Row: {
+          break_end_time: string | null
+          break_start_time: string | null
+          consultation_duration: number | null
+          created_at: string | null
+          day_of_week: number
+          end_time: string
+          id: string
+          is_available: boolean | null
+          max_consultations_per_day: number | null
+          specialist_id: string
+          start_time: string
+          updated_at: string | null
+        }
+        Insert: {
+          break_end_time?: string | null
+          break_start_time?: string | null
+          consultation_duration?: number | null
+          created_at?: string | null
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_available?: boolean | null
+          max_consultations_per_day?: number | null
+          specialist_id: string
+          start_time: string
+          updated_at?: string | null
+        }
+        Update: {
+          break_end_time?: string | null
+          break_start_time?: string | null
+          consultation_duration?: number | null
+          created_at?: string | null
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_available?: boolean | null
+          max_consultations_per_day?: number | null
+          specialist_id?: string
+          start_time?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "specialist_schedule_config_specialist_id_fkey"
+            columns: ["specialist_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       specialist_schedules: {
         Row: {
@@ -484,7 +796,33 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cleanup_old_notifications: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      create_default_specialist_schedule: {
+        Args: { p_specialist_id: string }
+        Returns: undefined
+      }
+      create_free_session_after_purchase: {
+        Args: {
+          p_user_id: string
+          p_pdf_material_id: string
+          p_expiry_days?: number
+        }
+        Returns: string
+      }
+      expire_old_free_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      get_available_slots: {
+        Args: { p_specialist_id: string; p_date: string; p_duration?: number }
+        Returns: {
+          slot_time: string
+          slot_datetime: string
+        }[]
+      }
     }
     Enums: {
       consultation_status: "agendada" | "concluida" | "cancelada"
@@ -497,21 +835,25 @@ export type Database = {
   }
 }
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
@@ -529,14 +871,16 @@ export type Tables<
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
@@ -552,14 +896,16 @@ export type TablesInsert<
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
@@ -575,14 +921,16 @@ export type TablesUpdate<
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
@@ -590,14 +938,16 @@ export type Enums<
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
