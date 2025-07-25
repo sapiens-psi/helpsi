@@ -115,8 +115,8 @@ export const ConsultationHistory = ({ showAll = false, maxItems = 5 }: Consultat
 
   const filteredConsultations = consultations.filter(consultation => {
     const matchesSearch = !searchTerm || 
-      consultation.specialist?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      consultation.specialist?.specialization?.toLowerCase().includes(searchTerm.toLowerCase());
+      consultation.specialist?.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      consultation.specialist?.specialties?.join(', ')?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || consultation.status === statusFilter;
     const matchesType = typeFilter === 'all' || consultation.type === typeFilter;
@@ -250,11 +250,11 @@ export const ConsultationHistory = ({ showAll = false, maxItems = 5 }: Consultat
                       <div className="flex items-center text-sm text-gray-600">
                         <User className="h-4 w-4 mr-2" />
                         <span className="font-medium">
-                          {consultation.specialist?.full_name || 'Especialista não informado'}
+                          {consultation.specialist?.profiles?.full_name || 'Especialista não informado'}
                         </span>
-                        {consultation.specialist?.specialization && (
+                        {consultation.specialist?.specialties && (
                           <span className="ml-2 text-gray-500">
-                            • {consultation.specialist.specialization}
+                            • {consultation.specialist.specialties.join(', ')}
                           </span>
                         )}
                       </div>

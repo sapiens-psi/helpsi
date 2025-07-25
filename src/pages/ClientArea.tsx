@@ -152,11 +152,11 @@ const ClientArea = () => {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-600">Estado</label>
-                  <p className="text-gray-800">{profile?.estado || 'Não informado'}</p>
+                  <p className="text-gray-800">{(profile as any)?.estado || 'Não informado'}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-600">Cidade</label>
-                  <p className="text-gray-800">{profile?.cidade || 'Não informado'}</p>
+                  <p className="text-gray-800">{(profile as any)?.cidade || 'Não informado'}</p>
                 </div>
                 {profile?.crp && (
                   <div>
@@ -228,7 +228,7 @@ const ClientArea = () => {
                               {consultation.type === 'pre-compra' ? 'Pré-venda' : 'Pós-venda'}
                             </h3>
                             <p className="text-sm text-gray-600">
-                              com {consultation.specialist?.full_name || 'Especialista não informado'}
+                              com {consultation.specialist?.profiles?.full_name || 'Especialista não informado'}
                             </p>
                           </div>
                           <Badge className="bg-green-100 text-green-800">
@@ -245,7 +245,7 @@ const ClientArea = () => {
 
                         <div className="flex space-x-2">
                           <Link to={`/video-conference/${consultation.id}`}>
-                            <PulsatingButton size="sm" className="bg-green-500 hover:bg-green-600">
+                            <PulsatingButton className="bg-green-500 hover:bg-green-600 text-sm px-3 py-1">
                               <Video className="mr-2 h-4 w-4" />
                               Entrar na Sala
                             </PulsatingButton>

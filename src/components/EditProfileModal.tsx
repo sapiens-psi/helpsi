@@ -22,8 +22,8 @@ export const EditProfileModal = ({ children }: EditProfileModalProps) => {
     phone: profile?.phone || '',
     crp: profile?.crp || '',
     cpf_cnpj: profile?.cpf_cnpj || '',
-    estado: profile?.estado || '',
-    cidade: profile?.cidade || ''
+    estado: (profile as any)?.estado || '',
+    cidade: (profile as any)?.cidade || ''
   });
   
   const [isNotFromBrazil, setIsNotFromBrazil] = useState(false);
@@ -65,13 +65,13 @@ export const EditProfileModal = ({ children }: EditProfileModalProps) => {
         phone: profile.phone || '',
         crp: profile.crp || '',
         cpf_cnpj: profile.cpf_cnpj || '',
-        estado: profile.estado || '',
-        cidade: profile.cidade || ''
+        estado: (profile as any)?.estado || '',
+        cidade: (profile as any)?.cidade || ''
       });
       
       // Verifica se o estado não é um estado brasileiro E se há um estado cadastrado
-      const isBrazilianState = brazilianStates.some(state => state.value === profile.estado);
-      setIsNotFromBrazil(!isBrazilianState && profile.estado !== '' && profile.estado !== null);
+      const isBrazilianState = brazilianStates.some(state => state.value === (profile as any)?.estado);
+      setIsNotFromBrazil(!isBrazilianState && (profile as any)?.estado !== '' && (profile as any)?.estado !== null);
     }
   }, [profile]);
 

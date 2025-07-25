@@ -17,9 +17,10 @@ export const useClientConsultations = () => {
           *,
           specialist:specialists(
             id,
-            full_name,
-            specialization,
-            profiles(avatar_url)
+            specialties,
+            profiles!specialists_user_id_fkey(
+              full_name
+            )
           )
         `)
         .eq('client_id', user.id)
@@ -78,7 +79,7 @@ export const useRescheduleConsultation = () => {
         .update({
           scheduled_date: newDate,
           scheduled_time: newTime,
-          status: 'reagendada'
+          status: 'agendada'
         })
         .eq('id', consultationId)
         .eq('client_id', user.id)

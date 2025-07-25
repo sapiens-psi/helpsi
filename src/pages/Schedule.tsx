@@ -154,7 +154,7 @@ const Schedule = () => {
     if (validatedCoupon && validatedCoupon.type === 'validation' && selectedType === 'pos-compra') {
       duration = 15; // Ensure 15 minutes for validation coupons on pos-compra
       toast.info('Cupom de validação aplicado: consulta de 15 minutos gratuita.');
-    } else if (validatedCoupon && validatedCoupon.type === 'discount') {
+    } else if (validatedCoupon && validatedCoupon.type !== 'validation') {
       // Implement discount logic here for pricing.
       // For now, just a placeholder. The current system assumes consultations have fixed prices.
       // If prices become dynamic, this is where discount calculations would happen.
