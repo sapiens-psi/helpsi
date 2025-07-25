@@ -5,10 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useConsultations } from '@/hooks/useConsultations';
-import { Calendar, Clock, Phone, User } from 'lucide-react';
+import { Calendar, Clock, Phone, User, Video } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const AgendaPosVenda = () => {
   const { data: consultations = [] } = useConsultations();
+  const navigate = useNavigate();
   
   const posVendaConsultations = consultations.filter(c => c.type === 'pos-compra');
   const agendadas = posVendaConsultations.filter(c => c.status === 'agendada');
@@ -60,15 +62,36 @@ const AgendaPosVenda = () => {
               {consultation.duration_minutes} min
             </div>
           </div>
+          
+          {consultation.meeting_room_id && (
+            <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+              <div className="flex items-center text-sm text-blue-700">
+                <Video className="mr-2 h-4 w-4" />
+                <span className="font-medium">Sala de Conferência:</span>
+                <span className="ml-2">{consultation.client?.full_name || 'Cliente'}</span>
+              </div>
+              <p className="text-xs text-blue-600 mt-1">{consultation.description}</p>
+            </div>
+          )}
         </div>
         
         <div className="flex space-x-2 mt-4">
           <Button variant="outline" size="sm">
             Ver Detalhes
           </Button>
-          {consultation.status === 'agendada' && (
-            <Button size="sm">
-              Iniciar Consulta
+          {consultation.status === 'agendada' && consultation.meeting_room_id && (
+            <Button 
+              size="sm" 
+              onClick={() => navigate(`/conference/${consultation.meeting_room_id}`)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Video className="mr-2 h-4 w-4" />
+              Acessar Sala
+            </Button>
+          )}
+          {consultation.status === 'agendada' && !consultation.meeting_room_id && (
+            <Button size="sm" disabled>
+              Sala não disponível
             </Button>
           )}
         </div>

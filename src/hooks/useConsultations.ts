@@ -24,11 +24,21 @@ export const useCreateConsultation = () => {
     mutationFn: async (consultationData: any) => {
       if (!user) throw new Error('User not authenticated');
       
+      // Remove client_id from consultationData if it exists to avoid conflicts
+      const { client_id, ...cleanData } = consultationData;
+      
       const { data, error } = await supabase
         .from('consultations')
         .insert({
-          ...consultationData,
-          client_id: user.id
+          client_id: user.id,
+          type: cleanData.type,
+          scheduled_date: cleanData.scheduled_date,
+          scheduled_time: cleanData.scheduled_time,
+          description: cleanData.description,
+          duration_minutes: cleanData.duration_minutes,
+          coupon_code_used: cleanData.coupon_code_used,
+          coupon_id: cleanData.coupon_id,
+          status: 'agendada'
         })
         .select()
         .single();

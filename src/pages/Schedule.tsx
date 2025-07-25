@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar, Clock, User, Ticket } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { useCreateConsultation } from '@/hooks/useSchedule';
+import { useCreateConsultation } from '@/hooks/useConsultations';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -60,25 +60,44 @@ const Schedule = () => {
         .from('coupons')
         .select('*')
         .eq('code', code.toUpperCase())
+        .eq('type', 'validation') // Apenas cupons de validação
         .single();
 
       if (error) {
-        throw new Error('Cupom inválido ou não encontrado.');
+        throw new Error('Cupom de validação inválido ou não encontrado.');
       }
       if (!data.is_active) {
-        throw new Error('Cupom inativo.');
+        throw new Error('Cupom de validação inativo.');
       }
       if (data.expires_at && new Date(data.expires_at) < new Date()) {
-        throw new Error('Cupom expirado.');
+        throw new Error('Cupom de validação expirado.');
       }
       if (data.usage_limit !== null && data.current_usage_count >= data.usage_limit) {
-        throw new Error('Cupom esgotado.');
+        throw new Error('Cupom de validação esgotado.');
       }
 
-      // Check individual usage limit (if applicable, for future)
-      // This requires tracking user's past coupon usage, which is not implemented yet.
-      // For now, validation coupons have individual_usage_limit: 1 set in DB schema.
-      // Discount coupons could have higher.
+      // Verificar se é realmente um cupom de validação
+      if (data.type !== 'validation') {
+        throw new Error('Apenas cupons de validação são aceitos para agendamento.');
+      }
+
+      // Verificar uso individual por usuário
+      if (user?.id && data.individual_usage_limit > 0) {
+        const { data: userUsage, error: usageError } = await supabase
+          .from('consultations')
+          .select('id')
+          .eq('client_id', user.id)
+          .eq('coupon_id', data.id);
+
+        if (usageError) {
+          throw new Error('Erro ao verificar histórico de uso do cupom.');
+        }
+
+        const currentUserUsage = userUsage?.length || 0;
+        if (currentUserUsage >= data.individual_usage_limit) {
+          throw new Error(`Você já utilizou este cupom o máximo de ${data.individual_usage_limit} vez(es) permitida(s).`);
+        }
+      }
 
       return data as Coupon;
     },
@@ -113,6 +132,18 @@ const Schedule = () => {
     e.preventDefault();
     if (!selectedType || !selectedDate || !selectedTime || !user?.id) {
       toast.error('Por favor, preencha todos os campos obrigatórios.');
+      return;
+    }
+
+    // Validação obrigatória de cupom
+    if (!validatedCoupon) {
+      toast.error('É obrigatório usar um cupom de validação para agendar uma consulta.');
+      return;
+    }
+
+    // Verificar se o cupom é do tipo validação
+    if (validatedCoupon.type !== 'validation') {
+      toast.error('Apenas cupons de validação são aceitos para agendamento de consultas.');
       return;
     }
 
@@ -304,40 +335,44 @@ const Schedule = () => {
             </div>
 
             {/* Coupon Section */}
-            <Card className="border-blue-100 shadow-lg bg-white/90">
+            <Card className="border-red-100 shadow-lg bg-white/90">
               <CardHeader>
-                <CardTitle className="flex items-center text-blue-500">
-                  <Ticket className="mr-2 h-5 w-5 text-blue-500" />
-                  Possui um Cupom?
+                <CardTitle className="flex items-center text-red-500">
+                  <Ticket className="mr-2 h-5 w-5 text-red-500" />
+                  Cupom de Validação (Obrigatório) *
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="mb-3 p-3 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-md text-sm">
+                  <strong>Atenção:</strong> É obrigatório usar um cupom de validação para agendar qualquer consulta. Apenas cupons do tipo "validação" são aceitos.
+                </div>
                 <div className="space-y-2">
-                  <Label htmlFor="couponCode">Código do Cupom</Label>
+                  <Label htmlFor="couponCode">Código do Cupom de Validação *</Label>
                   <Input
                     id="couponCode"
                     type="text"
                     value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value)}
-                    placeholder="Digite seu cupom aqui"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:border-blue-500"
+                    placeholder="Digite seu cupom de validação aqui"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:border-red-500"
+                    required
                   />
                 </div>
                 <Button 
                   onClick={handleApplyCoupon}
-                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  className="w-full bg-red-600 hover:bg-red-700"
                   disabled={isCouponValidating}
                 >
-                  {isCouponValidating ? 'Validando...' : 'Aplicar Cupom'}
+                  {isCouponValidating ? 'Validando...' : 'Aplicar Cupom de Validação'}
                 </Button>
                 {validatedCoupon && (
                   <div className="mt-4 p-3 bg-green-50 text-green-700 border border-green-200 rounded-md">
-                    Cupom \'{validatedCoupon.code}\' aplicado! {validatedCoupon.type === 'validation' ? 'Ganhe 15 minutos gratuitos.' : `Desconto de ${validatedCoupon.value}${validatedCoupon.discount_type === 'percentage' ? '%' : ' R$'}.`}
+                    ✅ Cupom de validação '{validatedCoupon.code}' aplicado com sucesso! {validatedCoupon.type === 'validation' ? 'Agora você pode agendar sua consulta.' : `Desconto de ${validatedCoupon.value}${validatedCoupon.discount_type === 'percentage' ? '%' : ' R$'}.`}
                   </div>
                 )}
                 {validatedCoupon === null && couponCode !== '' && !isCouponValidating && (
                   <div className="mt-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-md">
-                    Cupom inválido ou não aplicável.
+                    ❌ Cupom inválido, expirado ou não é um cupom de validação. Verifique o código e tente novamente.
                   </div>
                 )}
               </CardContent>

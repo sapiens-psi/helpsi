@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ClientArea from "./pages/ClientArea";
+import ClientHistory from "./pages/ClientHistory";
 import Schedule from "./pages/Schedule";
 import VideoConference from "./pages/VideoConference";
 import NotFound from "./pages/NotFound";
@@ -59,6 +60,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <ClientArea />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/client/history" 
+              element={
+                <ProtectedRoute>
+                  <ClientHistory />
                 </ProtectedRoute>
               } 
             />

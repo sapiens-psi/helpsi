@@ -1,40 +1,53 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-// TODO: implementar o hook useMyConsultations para buscar os agendamentos do usuário
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConsultationHistory } from '@/components/ConsultationHistory';
+import { ClientStats } from '@/components/ClientStats';
+import { ArrowLeft, Calendar } from 'lucide-react';
 
 const MeusAgendamentos = () => {
-  // const { data: agendamentos, isLoading } = useMyConsultations();
-  // Mock temporário:
-  const agendamentos = [
-    { id: 1, data: '2024-06-01', hora: '14:00', especialista: 'Dra. Ana', status: 'Confirmado' },
-    { id: 2, data: '2024-06-10', hora: '09:30', especialista: 'Dr. João', status: 'Pendente' },
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white py-12 px-4">
-      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-8">
-        <h1 className="text-2xl font-bold text-blue-700 mb-6">Meus Agendamentos</h1>
-        {/* {isLoading ? (
-          <div>Carregando...</div>
-        ) : ( */}
-        <ul className="space-y-4">
-          {agendamentos.map((ag) => (
-            <li key={ag.id} className="border rounded p-4 flex flex-col md:flex-row md:items-center md:justify-between">
-              <div>
-                <div className="font-semibold text-gray-800">{ag.data} às {ag.hora}</div>
-                <div className="text-gray-600 text-sm">Especialista: {ag.especialista}</div>
-              </div>
-              <div className="mt-2 md:mt-0">
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${ag.status === 'Confirmado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{ag.status}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
-        {/* )} */}
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-blue-50 py-12 px-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <Link to="/client-area" className="inline-flex items-center text-gray-600 hover:text-pink-500 mb-4 transition-colors">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar para Área do Cliente
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+            <Calendar className="h-8 w-8 mr-3 text-pink-500" />
+            Meus Agendamentos
+          </h1>
+          <p className="text-gray-600">
+            Gerencie todas as suas consultas agendadas, visualize o histórico e acompanhe o status.
+          </p>
+        </div>
+
+        {/* Statistics */}
+        <div className="mb-8">
+          <ClientStats />
+        </div>
+
+        {/* Full Consultation History */}
+        <Card className="shadow-lg">
+          <ConsultationHistory showAll={true} />
+        </Card>
+
+        {/* Quick Actions */}
+        <div className="mt-8 text-center">
+          <Link to="/schedule">
+            <Button className="bg-pink-500 hover:bg-pink-600 text-white px-8 py-3 text-lg">
+              <Calendar className="h-5 w-5 mr-2" />
+              Agendar Nova Consulta
+            </Button>
+          </Link>
+        </div>
       </div>
     </div>
   );
 };
 
-export default MeusAgendamentos; 
+export default MeusAgendamentos;
