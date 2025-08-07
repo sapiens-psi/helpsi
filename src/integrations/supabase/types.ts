@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.12 (cd3cf9e)"
+    PostgrestVersion: "13.0.4"
   }
   public: {
     Tables: {
@@ -46,7 +46,6 @@ export type Database = {
           },
         ]
       }
-
       company_documents: {
         Row: {
           company_id: string | null
@@ -118,7 +117,162 @@ export type Database = {
         }
         Relationships: []
       }
-
+      consultations_pos_compra: {
+        Row: {
+          client_id: string | null
+          coupon_code_used: string | null
+          coupon_id: string | null
+          created_at: string | null
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          meeting_room_id: string | null
+          purchase_date: string | null
+          recording_expires_at: string | null
+          recording_url: string | null
+          scheduled_date: string
+          scheduled_time: string
+          slot_id: string | null
+          specialist_id: string | null
+          status: string | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          coupon_code_used?: string | null
+          coupon_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          meeting_room_id?: string | null
+          purchase_date?: string | null
+          recording_expires_at?: string | null
+          recording_url?: string | null
+          scheduled_date: string
+          scheduled_time: string
+          slot_id?: string | null
+          specialist_id?: string | null
+          status?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          coupon_code_used?: string | null
+          coupon_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          meeting_room_id?: string | null
+          purchase_date?: string | null
+          recording_expires_at?: string | null
+          recording_url?: string | null
+          scheduled_date?: string
+          scheduled_time?: string
+          slot_id?: string | null
+          specialist_id?: string | null
+          status?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consultations_pos_compra_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_slots_pos_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_consultations_pos_compra_meeting_room"
+            columns: ["meeting_room_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consultations_pre_compra: {
+        Row: {
+          client_id: string | null
+          coupon_code_used: string | null
+          coupon_id: string | null
+          created_at: string | null
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          meeting_room_id: string | null
+          purchase_date: string | null
+          recording_expires_at: string | null
+          recording_url: string | null
+          scheduled_date: string
+          scheduled_time: string
+          slot_id: string | null
+          specialist_id: string | null
+          status: string | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          coupon_code_used?: string | null
+          coupon_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          meeting_room_id?: string | null
+          purchase_date?: string | null
+          recording_expires_at?: string | null
+          recording_url?: string | null
+          scheduled_date: string
+          scheduled_time: string
+          slot_id?: string | null
+          specialist_id?: string | null
+          status?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          coupon_code_used?: string | null
+          coupon_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          meeting_room_id?: string | null
+          purchase_date?: string | null
+          recording_expires_at?: string | null
+          recording_url?: string | null
+          scheduled_date?: string
+          scheduled_time?: string
+          slot_id?: string | null
+          specialist_id?: string | null
+          status?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consultations_pre_compra_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_slots_pre_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_consultations_pre_compra_meeting_room"
+            columns: ["meeting_room_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coupons: {
         Row: {
           code: string
@@ -167,12 +321,11 @@ export type Database = {
         }
         Relationships: []
       }
-
-        ]
-      }
       meeting_rooms: {
         Row: {
           consultation_id: string | null
+          consultations_pos_compra_id: string | null
+          consultations_pre_compra_id: string | null
           created_at: string | null
           created_manually: boolean | null
           description: string | null
@@ -187,6 +340,8 @@ export type Database = {
         }
         Insert: {
           consultation_id?: string | null
+          consultations_pos_compra_id?: string | null
+          consultations_pre_compra_id?: string | null
           created_at?: string | null
           created_manually?: boolean | null
           description?: string | null
@@ -201,6 +356,8 @@ export type Database = {
         }
         Update: {
           consultation_id?: string | null
+          consultations_pos_compra_id?: string | null
+          consultations_pre_compra_id?: string | null
           created_at?: string | null
           created_manually?: boolean | null
           description?: string | null
@@ -213,7 +370,22 @@ export type Database = {
           started_at?: string | null
           type?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "meeting_rooms_consultations_pos_compra_id_fkey"
+            columns: ["consultations_pos_compra_id"]
+            isOneToOne: false
+            referencedRelation: "consultations_pos_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_rooms_consultations_pre_compra_id_fkey"
+            columns: ["consultations_pre_compra_id"]
+            isOneToOne: false
+            referencedRelation: "consultations_pre_compra"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -335,7 +507,7 @@ export type Database = {
         }
         Relationships: []
       }
-      schedule_config: {
+      schedule_config_pos_compra: {
         Row: {
           business_hours: Json | null
           created_at: string | null
@@ -371,23 +543,117 @@ export type Database = {
         }
         Relationships: []
       }
-      schedule_prices: {
+      schedule_config_pre_compra: {
         Row: {
-          id: number
-          posvenda: Json | null
-          prevenda: Json | null
+          business_hours: Json | null
+          created_at: string | null
+          diasSemana: Json | null
+          duracaoConsulta: number | null
+          holidays: Json | null
+          horarios: Json | null
+          id: string
+          intervaloEntreConsultas: number | null
+          updated_at: string | null
         }
         Insert: {
-          id?: number
-          posvenda?: Json | null
-          prevenda?: Json | null
+          business_hours?: Json | null
+          created_at?: string | null
+          diasSemana?: Json | null
+          duracaoConsulta?: number | null
+          holidays?: Json | null
+          horarios?: Json | null
+          id?: string
+          intervaloEntreConsultas?: number | null
+          updated_at?: string | null
         }
         Update: {
-          id?: number
-          posvenda?: Json | null
-          prevenda?: Json | null
+          business_hours?: Json | null
+          created_at?: string | null
+          diasSemana?: Json | null
+          duracaoConsulta?: number | null
+          holidays?: Json | null
+          horarios?: Json | null
+          id?: string
+          intervaloEntreConsultas?: number | null
+          updated_at?: string | null
         }
         Relationships: []
+      }
+      schedule_slots_pos_compra: {
+        Row: {
+          config_id: string | null
+          created_at: string | null
+          day_of_week: string
+          id: string
+          is_active: boolean | null
+          max_consultations: number | null
+          start_time: string
+        }
+        Insert: {
+          config_id?: string | null
+          created_at?: string | null
+          day_of_week: string
+          id?: string
+          is_active?: boolean | null
+          max_consultations?: number | null
+          start_time: string
+        }
+        Update: {
+          config_id?: string | null
+          created_at?: string | null
+          day_of_week?: string
+          id?: string
+          is_active?: boolean | null
+          max_consultations?: number | null
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_slots_pos_compra_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_config_pos_compra"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedule_slots_pre_compra: {
+        Row: {
+          config_id: string | null
+          created_at: string | null
+          day_of_week: string
+          id: string
+          is_active: boolean | null
+          max_consultations: number | null
+          start_time: string
+        }
+        Insert: {
+          config_id?: string | null
+          created_at?: string | null
+          day_of_week: string
+          id?: string
+          is_active?: boolean | null
+          max_consultations?: number | null
+          start_time: string
+        }
+        Update: {
+          config_id?: string | null
+          created_at?: string | null
+          day_of_week?: string
+          id?: string
+          is_active?: boolean | null
+          max_consultations?: number | null
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_slots_pre_compra_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_config_pre_compra"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       specialist_general_config: {
         Row: {
@@ -625,13 +891,60 @@ export type Database = {
         Args: { p_specialist_id: string }
         Returns: undefined
       }
-
+      create_free_session_after_purchase: {
+        Args: {
+          p_user_id: string
+          p_pdf_material_id: string
+          p_expiry_days?: number
+        }
+        Returns: string
+      }
+      expire_old_free_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      get_available_days: {
+        Args: {
+          p_schedule_type: string
+          p_start_date: string
+          p_end_date: string
+        }
+        Returns: {
+          available_date: string
+        }[]
+      }
       get_available_slots: {
         Args: { p_specialist_id: string; p_date: string; p_duration?: number }
         Returns: {
           slot_time: string
           slot_datetime: string
         }[]
+      }
+      get_available_time_slots_pos_compra: {
+        Args: { p_date: string }
+        Returns: {
+          slot_time: string
+          max_consultations: number
+          current_bookings: number
+          available_spots: number
+          display_time: string
+        }[]
+      }
+      get_available_time_slots_pre_compra: {
+        Args: { p_date: string }
+        Returns: Record<string, unknown>[]
+      }
+      is_time_slot_available: {
+        Args: { p_date: string; p_time: string; p_schedule_type: string }
+        Returns: boolean
+      }
+      is_time_slot_available_pos_compra: {
+        Args: { p_date: string; p_time: string }
+        Returns: boolean
+      }
+      is_time_slot_available_pre_compra: {
+        Args: { p_date: string; p_time: string }
+        Returns: boolean
       }
     }
     Enums: {
