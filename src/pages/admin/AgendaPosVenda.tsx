@@ -63,14 +63,14 @@ const AgendaPosVenda = () => {
             </div>
           </div>
           
-          {consultation.meeting_room_id && (
+          {consultation.meeting_room && (
             <div className="mt-3 p-3 bg-blue-50 rounded-lg">
               <div className="flex items-center text-sm text-blue-700">
                 <Video className="mr-2 h-4 w-4" />
                 <span className="font-medium">Sala de Conferência:</span>
-                <span className="ml-2">{consultation.client?.full_name || 'Cliente'}</span>
+                <span className="ml-2">{consultation.meeting_room.name}</span>
               </div>
-              <p className="text-xs text-blue-600 mt-1">{consultation.description}</p>
+              <p className="text-xs text-blue-600 mt-1">Token: {consultation.meeting_room.room_token}</p>
             </div>
           )}
         </div>
@@ -79,17 +79,17 @@ const AgendaPosVenda = () => {
           <Button variant="outline" size="sm">
             Ver Detalhes
           </Button>
-          {consultation.status === 'agendada' && consultation.meeting_room_id && (
+          {consultation.status === 'agendada' && consultation.meeting_room && (
             <Button 
               size="sm" 
-              onClick={() => navigate(`/conference/${consultation.meeting_room_id}`)}
+              onClick={() => navigate(`/conference/${consultation.meeting_room.id}`)}
               className="bg-blue-600 hover:bg-blue-700"
             >
               <Video className="mr-2 h-4 w-4" />
               Acessar Sala
             </Button>
           )}
-          {consultation.status === 'agendada' && !consultation.meeting_room_id && (
+          {consultation.status === 'agendada' && !consultation.meeting_room && (
             <Button size="sm" disabled>
               Sala não disponível
             </Button>

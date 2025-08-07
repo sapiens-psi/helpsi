@@ -1,30 +1,22 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { PulsatingButton } from '@/components/magicui/pulsating-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, User, Mail, Settings, TrendingUp, FileText, Info, Bell, Video } from 'lucide-react';
+import { Calendar, Clock, User, Settings, TrendingUp, FileText, Info, Bell, Video } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useClientConsultations } from '@/hooks/useClientConsultations';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { ClientStats } from '@/components/ClientStats';
 import { ConsultationHistory } from '@/components/ConsultationHistory';
-import logo from '@/assets/helpsilogo.png';
+import { ModernNavbar } from '@/components/ModernNavbar';
 
 const ClientArea = () => {
   const { user, signOut } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { data: consultations = [], isLoading: consultationsLoading } = useClientConsultations();
-  const location = useLocation();
 
   const upcomingConsultations = consultations.filter(c => 
     c.status === 'agendada' && new Date(`${c.scheduled_date}T${c.scheduled_time}`) > new Date()
@@ -48,68 +40,8 @@ const ClientArea = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#7b2ff2] via-[#f357a8] to-[#0a223a] flex flex-col">
-      {/* Navbar */}
-      <nav className="flex items-center justify-between px-10 py-6">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center">
-            <img src={logo} alt="Helpsi Logo" className="h-16 w-auto" />
-          </div>
-        </div>
-        <div className="flex-1 flex justify-center gap-8 items-center text-white font-medium">
-          <Link to="/" className={`hover:text-pink-300 transition ${location.pathname === '/' ? 'lamp-effect' : ''}`}>Home</Link>
-          <Link to="/about" className={`hover:text-pink-300 transition ${location.pathname === '/about' ? 'lamp-effect' : ''}`}>Sobre</Link>
-          <Link to="/contact" className={`hover:text-pink-300 transition ${location.pathname === '/contact' ? 'lamp-effect' : ''}`}>Contato</Link>
-          {user && (
-            <>
-              <Link to="/schedule" className={`hover:text-pink-300 transition ${location.pathname === '/schedule' ? 'lamp-effect' : ''}`}>Agendar</Link>
-              <Link to="/client-area" className={`hover:text-pink-300 transition ${location.pathname === '/client-area' ? 'lamp-effect' : ''}`}>Área do Cliente</Link>
-            </>
-          )}
-        </div>
-        <div className="flex gap-4 items-center">
-          {!user ? (
-            <>
-              <Link to="/auth">
-                <Button variant="outline" className="border-pink-200 text-pink-400 hover:bg-pink-50 ml-2">Login</Button>
-              </Link>
-              <Link to="/auth">
-                <Button className="bg-pink-400 hover:bg-pink-500 ml-2">Cadastrar</Button>
-              </Link>
-            </>
-          ) :
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <PulsatingButton
-                  pulseColor="#f472b6"
-                  className="bg-white/80 text-pink-500 font-bold hover:bg-white"
-                >
-                  {profile?.full_name || 'Perfil'}
-                </PulsatingButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {profile?.role === 'admin' ? (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin">Painel Administrativo</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
-                  </>
-                ) : (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link to="/client-area">Área do Cliente</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          }
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gradient-primary">
+      <ModernNavbar />
 
       <div className="container mx-auto px-4 py-8 flex-1">
         <div className="grid lg:grid-cols-3 gap-8">
@@ -244,12 +176,19 @@ const ClientArea = () => {
                         </div>
 
                         <div className="flex space-x-2">
-                          <Link to={`/video-conference/${consultation.id}`}>
-                            <PulsatingButton className="bg-green-500 hover:bg-green-600 text-sm px-3 py-1">
-                              <Video className="mr-2 h-4 w-4" />
-                              Entrar na Sala
-                            </PulsatingButton>
-                          </Link>
+                          {consultation.meeting_room && (
+                            <Link to={`/conference/${consultation.meeting_room.id}`}>
+                              <PulsatingButton className="bg-green-500 hover:bg-green-600 text-sm px-3 py-1">
+                                <Video className="mr-2 h-4 w-4" />
+                                Entrar na Sala
+                              </PulsatingButton>
+                            </Link>
+                          )}
+                          {!consultation.meeting_room && (
+                            <Badge variant="outline" className="text-orange-600 border-orange-300">
+                              Sala em preparação
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     ))}

@@ -46,45 +46,7 @@ export type Database = {
           },
         ]
       }
-      chat_messages: {
-        Row: {
-          consultation_id: string | null
-          id: string
-          message: string
-          sender_id: string | null
-          sent_at: string | null
-        }
-        Insert: {
-          consultation_id?: string | null
-          id?: string
-          message: string
-          sender_id?: string | null
-          sent_at?: string | null
-        }
-        Update: {
-          consultation_id?: string | null
-          id?: string
-          message?: string
-          sender_id?: string | null
-          sent_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "chat_messages_consultation_id_fkey"
-            columns: ["consultation_id"]
-            isOneToOne: false
-            referencedRelation: "consultations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "chat_messages_sender_id_fkey"
-            columns: ["sender_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+
       company_documents: {
         Row: {
           company_id: string | null
@@ -156,88 +118,7 @@ export type Database = {
         }
         Relationships: []
       }
-      consultations: {
-        Row: {
-          client_id: string | null
-          coupon_code_used: string | null
-          coupon_id: string | null
-          created_at: string | null
-          description: string | null
-          duration_minutes: number | null
-          id: string
-          meeting_room_id: string | null
-          purchase_date: string | null
-          recording_expires_at: string | null
-          recording_url: string | null
-          scheduled_date: string
-          scheduled_time: string
-          specialist_id: string | null
-          status: Database["public"]["Enums"]["consultation_status"] | null
-          type: Database["public"]["Enums"]["consultation_type"]
-          updated_at: string | null
-        }
-        Insert: {
-          client_id?: string | null
-          coupon_code_used?: string | null
-          coupon_id?: string | null
-          created_at?: string | null
-          description?: string | null
-          duration_minutes?: number | null
-          id?: string
-          meeting_room_id?: string | null
-          purchase_date?: string | null
-          recording_expires_at?: string | null
-          recording_url?: string | null
-          scheduled_date: string
-          scheduled_time: string
-          specialist_id?: string | null
-          status?: Database["public"]["Enums"]["consultation_status"] | null
-          type: Database["public"]["Enums"]["consultation_type"]
-          updated_at?: string | null
-        }
-        Update: {
-          client_id?: string | null
-          coupon_code_used?: string | null
-          coupon_id?: string | null
-          created_at?: string | null
-          description?: string | null
-          duration_minutes?: number | null
-          id?: string
-          meeting_room_id?: string | null
-          purchase_date?: string | null
-          recording_expires_at?: string | null
-          recording_url?: string | null
-          scheduled_date?: string
-          scheduled_time?: string
-          specialist_id?: string | null
-          status?: Database["public"]["Enums"]["consultation_status"] | null
-          type?: Database["public"]["Enums"]["consultation_type"]
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "consultations_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "consultations_coupon_id_fkey"
-            columns: ["coupon_id"]
-            isOneToOne: false
-            referencedRelation: "coupons"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "consultations_specialist_id_fkey"
-            columns: ["specialist_id"]
-            isOneToOne: false
-            referencedRelation: "specialists"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+
       coupons: {
         Row: {
           code: string
@@ -286,59 +167,7 @@ export type Database = {
         }
         Relationships: []
       }
-      free_sessions: {
-        Row: {
-          consultation_id: string | null
-          created_at: string | null
-          expires_at: string
-          id: string
-          pdf_material_id: string
-          status: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          consultation_id?: string | null
-          created_at?: string | null
-          expires_at: string
-          id?: string
-          pdf_material_id: string
-          status?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          consultation_id?: string | null
-          created_at?: string | null
-          expires_at?: string
-          id?: string
-          pdf_material_id?: string
-          status?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "free_sessions_consultation_id_fkey"
-            columns: ["consultation_id"]
-            isOneToOne: false
-            referencedRelation: "consultations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "free_sessions_pdf_material_id_fkey"
-            columns: ["pdf_material_id"]
-            isOneToOne: false
-            referencedRelation: "pdf_materials"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "free_sessions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
+
         ]
       }
       meeting_rooms: {
@@ -384,15 +213,7 @@ export type Database = {
           started_at?: string | null
           type?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "meeting_rooms_consultation_id_fkey"
-            columns: ["consultation_id"]
-            isOneToOne: false
-            referencedRelation: "consultations"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -804,18 +625,7 @@ export type Database = {
         Args: { p_specialist_id: string }
         Returns: undefined
       }
-      create_free_session_after_purchase: {
-        Args: {
-          p_user_id: string
-          p_pdf_material_id: string
-          p_expiry_days?: number
-        }
-        Returns: string
-      }
-      expire_old_free_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+
       get_available_slots: {
         Args: { p_specialist_id: string; p_date: string; p_duration?: number }
         Returns: {

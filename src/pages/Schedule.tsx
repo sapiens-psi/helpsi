@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { ModernNavbar } from '@/components/ModernNavbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PulsatingButton } from '@/components/magicui/pulsating-button';
@@ -10,16 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar, Clock, User, Ticket } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { useCreateConsultation } from '@/hooks/useConsultations';
+import { useAvailableSlots, useCreateConsultation } from '@/hooks/useSchedule';
 import { toast } from 'sonner';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import logo from '@/assets/helpsilogo.png';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -38,18 +30,60 @@ interface Coupon {
 }
 
 const Schedule = () => {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { data: profile } = useProfile();
-  const location = useLocation();
   const [selectedType, setSelectedType] = useState<'pos-compra' | 'pre-compra' | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [description, setDescription] = useState('');
+  // Campos específicos para pós-compra
+  const [materialName, setMaterialName] = useState('');
+  const [materialDoubt, setMaterialDoubt] = useState('');
+  // Campo específico para pré-compra
+  const [situationType, setSituationType] = useState('');
   const [couponCode, setCouponCode] = useState('');
   const [validatedCoupon, setValidatedCoupon] = useState<Coupon | null>(null);
   const [isCouponValidating, setIsCouponValidating] = useState(false);
+  // Use the new hook for available slots
+  const { data: availableSlotsData, isLoading: loadingSlots } = useAvailableSlots(
+    selectedDate, 
+    selectedType || 'pos-compra'
+  );
+  const availableSlots = availableSlotsData?.slots || [];
+  const [availableDays, setAvailableDays] = useState<string[]>([]);
+  const [loadingDays, setLoadingDays] = useState(false);
+  const [consultationDuration, setConsultationDuration] = useState<{preCompra: number, posCompra: number}>({preCompra: 30, posCompra: 15});
 
-  const { mutateAsync: createConsultation, isPending: isScheduling } = useCreateConsultation();
+const { mutateAsync: createConsultation, isPending: isScheduling } = useCreateConsultation();
+
+  // Função para buscar configurações de duração
+  const fetchConsultationDurations = async () => {
+    try {
+      // Buscar configuração pré-compra
+      const { data: preCompraConfig } = await supabase
+        .from('schedule_config_pre_compra')
+        .select('duracaoConsulta')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      // Buscar configuração pós-compra
+      const { data: posCompraConfig } = await supabase
+        .from('schedule_config_pos_compra')
+        .select('duracaoConsulta')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      setConsultationDuration({
+        preCompra: preCompraConfig?.duracaoConsulta || 30,
+        posCompra: posCompraConfig?.duracaoConsulta || 15
+      });
+    } catch (error) {
+      console.error('Erro ao buscar configurações de duração:', error);
+      // Manter valores padrão em caso de erro
+    }
+   };
 
   const queryClient = useQueryClient();
 
@@ -83,17 +117,24 @@ const Schedule = () => {
 
       // Verificar uso individual por usuário
       if (user?.id && data.individual_usage_limit > 0) {
-        const { data: userUsage, error: usageError } = await supabase
-          .from('consultations')
+        // Buscar uso em ambas as tabelas
+        const { data: preCompraUsage, error: preCompraError } = await supabase
+          .from('consultations_pre_compra')
           .select('id')
           .eq('client_id', user.id)
           .eq('coupon_id', data.id);
 
-        if (usageError) {
+        const { data: posCompraUsage, error: posCompraError } = await supabase
+          .from('consultations_pos_compra')
+          .select('id')
+          .eq('client_id', user.id)
+          .eq('coupon_id', data.id);
+
+        if (preCompraError || posCompraError) {
           throw new Error('Erro ao verificar histórico de uso do cupom.');
         }
 
-        const currentUserUsage = userUsage?.length || 0;
+        const currentUserUsage = (preCompraUsage?.length || 0) + (posCompraUsage?.length || 0);
         if (currentUserUsage >= data.individual_usage_limit) {
           throw new Error(`Você já utilizou este cupom o máximo de ${data.individual_usage_limit} vez(es) permitida(s).`);
         }
@@ -114,10 +155,61 @@ const Schedule = () => {
     }
   });
 
-  const availableTimes = [
-    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'
-  ];
+  // Função para buscar dias disponíveis
+  const fetchAvailableDays = async () => {
+    if (!selectedType) return;
+    
+    setLoadingDays(true);
+    try {
+      const scheduleType = selectedType === 'pos-compra' ? 'pos_compra' : 'pre_compra';
+      const today = new Date().toISOString().split('T')[0];
+      const twoMonthsLater = new Date();
+      twoMonthsLater.setMonth(twoMonthsLater.getMonth() + 2);
+      const endDate = twoMonthsLater.toISOString().split('T')[0];
+      
+      const { data, error } = await supabase.functions.invoke('get-available-days', {
+        body: { 
+          scheduleType,
+          startDate: today,
+          endDate: endDate
+        }
+      });
+      
+      if (error) throw error;
+      
+      const days = data?.availableDays?.map((day: any) => day.available_date) || [];
+      setAvailableDays(days);
+    } catch (error: any) {
+      console.error('Erro ao buscar dias disponíveis:', error);
+      toast.error('Erro ao carregar dias disponíveis');
+      setAvailableDays([]);
+    } finally {
+      setLoadingDays(false);
+    }
+  };
+
+  // Removed fetchAvailableSlots function - now using useAvailableSlots hook
+  
+  // Effect para buscar dias disponíveis quando o tipo muda
+  useEffect(() => {
+    if (selectedType) {
+      fetchAvailableDays();
+      setSelectedDate(''); // Limpar data selecionada
+      setSelectedTime(''); // Limpar horário selecionado
+    } else {
+      setAvailableDays([]);
+    }
+  }, [selectedType]);
+
+  // Effect para limpar horário selecionado quando a data muda
+  useEffect(() => {
+    setSelectedTime(''); // Limpar horário selecionado quando a data muda
+  }, [selectedDate]);
+
+  // Effect para buscar configurações de duração quando o componente for montado
+  useEffect(() => {
+    fetchConsultationDurations();
+  }, []);
 
   const handleApplyCoupon = () => {
     if (couponCode) {
@@ -135,30 +227,52 @@ const Schedule = () => {
       return;
     }
 
-    // Validação obrigatória de cupom
-    if (!validatedCoupon) {
-      toast.error('É obrigatório usar um cupom de validação para agendar uma consulta.');
-      return;
+    // Validação dos campos específicos por tipo
+    if (selectedType === 'pos-compra') {
+      if (!materialName.trim() || !materialDoubt.trim()) {
+         toast.error('Por favor, preencha o nome do material psicológico e a descrição da dúvida.');
+         return;
+       }
+      
+      if (!validatedCoupon) {
+        toast.error('É obrigatório usar um cupom de validação para agendar consultas pós-compra.');
+        return;
+      }
+
+      // Verificar se o cupom é do tipo validação
+      if (validatedCoupon.type !== 'validation') {
+        toast.error('Apenas cupons de validação são aceitos para agendamento de consultas pós-compra.');
+        return;
+      }
     }
 
-    // Verificar se o cupom é do tipo validação
-    if (validatedCoupon.type !== 'validation') {
-      toast.error('Apenas cupons de validação são aceitos para agendamento de consultas.');
-      return;
+    if (selectedType === 'pre-compra') {
+      if (!situationType.trim()) {
+        toast.error('Por favor, descreva o tipo de situação para qual você está buscando material psicológico.');
+        return;
+      }
     }
 
-    let duration = selectedType === 'pos-compra' ? 15 : 30;
+    let duration = selectedType === 'pos-compra' ? consultationDuration.posCompra : consultationDuration.preCompra;
     let finalCouponCode = validatedCoupon?.code || null;
     let finalCouponId = validatedCoupon?.id || null;
 
     if (validatedCoupon && validatedCoupon.type === 'validation' && selectedType === 'pos-compra') {
-      duration = 15; // Ensure 15 minutes for validation coupons on pos-compra
-      toast.info('Cupom de validação aplicado: consulta de 15 minutos gratuita.');
+      duration = consultationDuration.posCompra; // Use configured duration for validation coupons on pos-compra
+      toast.info('Cupom de validação aplicado: consulta gratuita.');
     } else if (validatedCoupon && validatedCoupon.type !== 'validation') {
       // Implement discount logic here for pricing.
       // For now, just a placeholder. The current system assumes consultations have fixed prices.
       // If prices become dynamic, this is where discount calculations would happen.
       toast.info(`Cupom de desconto aplicado: ${validatedCoupon.value}${validatedCoupon.discount_type === 'percentage' ? '%' : ' R$'}.`);
+    }
+
+    // Preparar descrição baseada no tipo de atendimento
+    let finalDescription = '';
+    if (selectedType === 'pos-compra') {
+      finalDescription = `Material: ${materialName}\n\nDúvida: ${materialDoubt}`;
+    } else if (selectedType === 'pre-compra') {
+      finalDescription = `Tipo de situação: ${situationType}`;
     }
 
     try {
@@ -167,7 +281,7 @@ const Schedule = () => {
         type: selectedType,
         scheduled_date: selectedDate,
         scheduled_time: selectedTime,
-        description,
+        description: finalDescription,
         duration_minutes: duration,
         coupon_code_used: finalCouponCode,
         coupon_id: finalCouponId
@@ -178,6 +292,9 @@ const Schedule = () => {
       setSelectedDate('');
       setSelectedTime('');
       setDescription('');
+      setMaterialName('');
+      setMaterialDoubt('');
+      setSituationType('');
       setCouponCode('');
       setValidatedCoupon(null);
     } catch (error: any) {
@@ -193,70 +310,8 @@ const Schedule = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#7b2ff2] via-[#f357a8] to-[#0a223a] flex flex-col">
-      {/* Navbar */}
-      <nav className="flex items-center justify-between px-10 py-6">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center">
-            <img src={logo} alt="Helpsi Logo" className="h-16 w-auto" />
-          </div>
-        </div>
-        {/* Centralizar links principais */}
-        <div className="flex-1 flex justify-center gap-8 items-center text-white font-medium">
-          <Link to="/" className={`hover:text-pink-300 transition ${location.pathname === '/' ? 'lamp-effect' : ''}`}>Home</Link>
-          <Link to="/about" className={`hover:text-pink-300 transition ${location.pathname === '/about' ? 'lamp-effect' : ''}`}>Sobre</Link>
-          <Link to="/contact" className={`hover:text-pink-300 transition ${location.pathname === '/contact' ? 'lamp-effect' : ''}`}>Contato</Link>
-          {user && (
-            <>
-              <Link to="/schedule" className={`hover:text-pink-300 transition ${location.pathname === '/schedule' ? 'lamp-effect' : ''}`}>Agendar</Link>
-              <Link to="/client-area" className={`hover:text-pink-300 transition ${location.pathname === '/client-area' ? 'lamp-effect' : ''}`}>Área do Cliente</Link>
-            </>
-          )}
-        </div>
-        {/* Botão de perfil/menu à direita */}
-        <div className="flex gap-4 items-center">
-          {!user ? (
-            <>
-              <Link to="/auth">
-                <button className="px-4 py-2 rounded-lg bg-white/80 text-pink-500 font-bold hover:bg-white">Login</button>
-              </Link>
-              <Link to="/auth">
-                <button className="px-4 py-2 rounded-lg bg-pink-400 text-white font-bold hover:bg-pink-500">Cadastrar</button>
-              </Link>
-            </>
-          ) :
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <PulsatingButton
-                  pulseColor="#f472b6"
-                  className="bg-white/80 text-pink-500 font-bold hover:bg-white"
-                >
-                  {profile?.full_name || 'Perfil'}
-                </PulsatingButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {profile?.role === 'admin' ? (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin">Painel Administrativo</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
-                  </>
-                ) : (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link to="/client-area">Área do Cliente</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          }
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gradient-primary">
+      <ModernNavbar />
 
       <div className="container mx-auto px-4 py-8 flex-1">
         <div className="max-w-4xl mx-auto">
@@ -283,7 +338,14 @@ const Schedule = () => {
                         ? 'border-pink-500 bg-pink-50'
                         : 'border-gray-200 hover:border-pink-300'
                     }`}
-                    onClick={() => setSelectedType('pos-compra')}
+                    onClick={() => {
+                      setSelectedType('pos-compra');
+                      // Limpar cupom ao trocar de tipo
+                      setCouponCode('');
+                      setValidatedCoupon(null);
+                      // Limpar campos específicos
+                      setSituationType('');
+                    }}
                   >
                     <div className="flex items-center mb-2">
                       <Clock className="h-5 w-5 text-pink-500 mr-2" />
@@ -300,7 +362,15 @@ const Schedule = () => {
                         ? 'border-purple-500 bg-purple-50'
                         : 'border-gray-200 hover:border-purple-300'
                     }`}
-                    onClick={() => setSelectedType('pre-compra')}
+                    onClick={() => {
+                      setSelectedType('pre-compra');
+                      // Limpar cupom ao trocar de tipo
+                      setCouponCode('');
+                      setValidatedCoupon(null);
+                      // Limpar campos específicos
+                      setMaterialName('');
+                      setMaterialDoubt('');
+                    }}
                   >
                     <div className="flex items-center mb-2">
                       <User className="h-5 w-5 text-purple-500 mr-2" />
@@ -313,70 +383,106 @@ const Schedule = () => {
                 </CardContent>
               </Card>
 
-              {selectedType && (
+              {selectedType === 'pos-compra' && (
+                <Card className="border-pink-100 shadow-lg bg-white/90">
+                   <CardHeader>
+                     <CardTitle className="text-pink-500">Informações sobre o Material Psicológico</CardTitle>
+                   </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                       <Label htmlFor="materialName">Nome do Material Psicológico *</Label>
+                       <Input
+                         id="materialName"
+                         type="text"
+                         value={materialName}
+                         onChange={(e) => setMaterialName(e.target.value)}
+                         placeholder="Digite o nome do material psicológico que você tem dúvida"
+                         className="border-gray-200 focus:border-pink-500"
+                         required
+                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="materialDoubt">Descrição da Dúvida *</Label>
+                      <Textarea
+                        id="materialDoubt"
+                        value={materialDoubt}
+                        onChange={(e) => setMaterialDoubt(e.target.value)}
+                        placeholder="Descreva detalhadamente sua dúvida sobre o material"
+                        className="min-h-32 border-gray-200 focus:border-pink-500"
+                        required
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {selectedType === 'pre-compra' && (
                 <Card className="border-pink-100 shadow-lg bg-white/90">
                   <CardHeader>
-                    <CardTitle className="text-pink-500">Descreva sua situação</CardTitle>
+                    <CardTitle className="text-pink-500">Tipo de Situação</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Textarea
-                      placeholder={
-                        selectedType === 'pos-compra'
-                          ? 'Descreva suas dúvidas sobre o produto adquirido...'
-                          : 'Conte-nos sobre sua situação e o que você está procurando...'
-                      }
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="min-h-32 border-gray-200 focus:border-pink-500"
-                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="situationType">Descreva o tipo de situação *</Label>
+                       <Textarea
+                         id="situationType"
+                         value={situationType}
+                         onChange={(e) => setSituationType(e.target.value)}
+                         placeholder="Descreva para qual tipo de situação você está buscando material psicológico (ex: ansiedade, depressão, terapia de casal, etc.)"
+                         className="min-h-32 border-gray-200 focus:border-pink-500"
+                         required
+                       />
+                    </div>
                   </CardContent>
                 </Card>
               )}
             </div>
 
-            {/* Coupon Section */}
-            <Card className="border-red-100 shadow-lg bg-white/90">
-              <CardHeader>
-                <CardTitle className="flex items-center text-red-500">
-                  <Ticket className="mr-2 h-5 w-5 text-red-500" />
-                  Cupom de Validação (Obrigatório) *
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="mb-3 p-3 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-md text-sm">
-                  <strong>Atenção:</strong> É obrigatório usar um cupom de validação para agendar qualquer consulta. Apenas cupons do tipo "validação" são aceitos.
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="couponCode">Código do Cupom de Validação *</Label>
-                  <Input
-                    id="couponCode"
-                    type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    placeholder="Digite seu cupom de validação aqui"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:border-red-500"
-                    required
-                  />
-                </div>
-                <Button 
-                  onClick={handleApplyCoupon}
-                  className="w-full bg-red-600 hover:bg-red-700"
-                  disabled={isCouponValidating}
-                >
-                  {isCouponValidating ? 'Validando...' : 'Aplicar Cupom de Validação'}
-                </Button>
-                {validatedCoupon && (
-                  <div className="mt-4 p-3 bg-green-50 text-green-700 border border-green-200 rounded-md">
-                    ✅ Cupom de validação '{validatedCoupon.code}' aplicado com sucesso! {validatedCoupon.type === 'validation' ? 'Agora você pode agendar sua consulta.' : `Desconto de ${validatedCoupon.value}${validatedCoupon.discount_type === 'percentage' ? '%' : ' R$'}.`}
+            {/* Coupon Section - Only for pos-compra */}
+            {selectedType === 'pos-compra' && (
+              <Card className="border-red-100 shadow-lg bg-white/90">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-red-500">
+                    <Ticket className="mr-2 h-5 w-5 text-red-500" />
+                    Cupom de Validação (Obrigatório) *
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="mb-3 p-3 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-md text-sm">
+                    <strong>Atenção:</strong> É obrigatório usar um cupom de validação para agendar consultas pós-compra. Apenas cupons do tipo "validação" são aceitos.
                   </div>
-                )}
-                {validatedCoupon === null && couponCode !== '' && !isCouponValidating && (
-                  <div className="mt-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-md">
-                    ❌ Cupom inválido, expirado ou não é um cupom de validação. Verifique o código e tente novamente.
+                  <div className="space-y-2">
+                    <Label htmlFor="couponCode">Código do Cupom de Validação *</Label>
+                    <Input
+                      id="couponCode"
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      placeholder="Digite seu cupom de validação aqui"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:border-red-500"
+                      required
+                    />
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                  <Button 
+                    onClick={handleApplyCoupon}
+                    className="w-full bg-red-600 hover:bg-red-700"
+                    disabled={isCouponValidating}
+                  >
+                    {isCouponValidating ? 'Validando...' : 'Aplicar Cupom de Validação'}
+                  </Button>
+                  {validatedCoupon && (
+                    <div className="mt-4 p-3 bg-green-50 text-green-700 border border-green-200 rounded-md">
+                      ✅ Cupom de validação '{validatedCoupon.code}' aplicado com sucesso! {validatedCoupon.type === 'validation' ? 'Agora você pode agendar sua consulta.' : `Desconto de ${validatedCoupon.value}${validatedCoupon.discount_type === 'percentage' ? '%' : ' R$'}.`}
+                    </div>
+                  )}
+                  {validatedCoupon === null && couponCode !== '' && !isCouponValidating && (
+                    <div className="mt-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-md">
+                      ❌ Cupom inválido, expirado ou não é um cupom de validação. Verifique o código e tente novamente.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Date and Time Selection */}
             {selectedType && (
@@ -391,35 +497,79 @@ const Schedule = () => {
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="date">Data</Label>
-                      <input
-                        id="date"
-                        type="date"
-                        min={getMinDate()}
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:border-pink-500"
-                      />
+                      {loadingDays ? (
+                        <div className="text-center py-4 text-gray-500">
+                          Carregando dias disponíveis...
+                        </div>
+                      ) : availableDays.length > 0 ? (
+                        <select
+                          id="date"
+                          value={selectedDate}
+                          onChange={(e) => setSelectedDate(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:border-pink-500"
+                        >
+                          <option value="">Selecione uma data disponível</option>
+                          {availableDays
+                            .filter(date => date >= getMinDate())
+                            .map((date, index) => (
+                              <option key={`date-${date}-${index}`} value={date}>
+                                {new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', {
+                                  weekday: 'long',
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })}
+                              </option>
+                            ))
+                          }
+                        </select>
+                      ) : (
+                        <div className="text-center py-4 text-gray-500">
+                          Nenhum dia disponível para agendamento no período.
+                        </div>
+                      )}
                     </div>
 
                     {selectedDate && (
                       <div className="space-y-2">
                         <Label>Horários Disponíveis</Label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {availableTimes.map((time) => (
-                            <button
-                              key={time}
-                              type="button"
-                              onClick={() => setSelectedTime(time)}
-                              className={`p-2 text-sm border rounded transition-all ${
-                                selectedTime === time
-                                  ? 'border-pink-500 bg-pink-50 text-pink-700'
-                                  : 'border-gray-200 hover:border-pink-300'
-                              }`}
-                            >
-                              {time}
-                            </button>
-                          ))}
-                        </div>
+                        {loadingSlots ? (
+                          <div className="text-center py-4 text-gray-500">
+                            Carregando horários disponíveis...
+                          </div>
+                        ) : availableSlots.length > 0 ? (
+                          <div className="grid grid-cols-3 gap-2">
+                            {availableSlots.map((slot, index) => {
+                              const slotTime = slot.time || slot.slot_time;
+                              const displayTime = slot.displayTime || slot.display_time;
+                              const availableSpots = slot.availableSpots || slot.available_spots;
+                              const maxConsultations = slot.maxConsultations || slot.max_consultations;
+                              
+                              return (
+                                <button
+                                  key={`slot-${slotTime}-${index}`}
+                                  type="button"
+                                  onClick={() => setSelectedTime(slotTime)}
+                                  className={`p-2 text-sm border rounded transition-all ${
+                                    selectedTime === slotTime
+                                      ? 'border-pink-500 bg-pink-50 text-pink-700'
+                                      : 'border-gray-200 hover:border-pink-300'
+                                  } relative`}
+                                  title={`${availableSpots} vaga(s) disponível(is)`}
+                                >
+                                  <div>{displayTime}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {availableSpots}/{maxConsultations}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-4 text-gray-500">
+                            Nenhum horário disponível para esta data.
+                          </div>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -450,7 +600,7 @@ const Schedule = () => {
                       <div className="flex justify-between">
                         <span className="text-gray-600">Duração:</span>
                         <span className="font-medium">
-                          {selectedType === 'pos-compra' ? '15 minutos' : '30 minutos'}
+                          {selectedType === 'pos-compra' ? `${consultationDuration.posCompra} minutos` : `${consultationDuration.preCompra} minutos`}
                         </span>
                       </div>
                       
@@ -468,11 +618,7 @@ const Schedule = () => {
             )}
           </div>
 
-          <div className="flex-1 flex justify-center items-center">
-            <div className="relative w-full max-w-md h-auto">
-              <img src={logo} alt="Helpsi Logo" className="h-16 w-auto mx-auto" />
-            </div>
-          </div>
+
         </div>
       </div>
 

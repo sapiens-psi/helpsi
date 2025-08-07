@@ -1,102 +1,49 @@
 import React from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { PulsatingButton } from '@/components/magicui/pulsating-button';
-import { useAuth } from '@/hooks/useAuth';
-import { useProfile } from '@/hooks/useProfile';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import logo from '@/assets/helpsilogo.png';
+import { ModernNavbar } from '@/components/ModernNavbar';
 
 const About = () => {
-  const { user, signOut } = useAuth();
-  const { data: profile } = useProfile();
-  const location = useLocation();
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#7b2ff2] via-[#f357a8] to-[#0a223a] flex flex-col">
-      {/* Navbar */}
-      <nav className="flex items-center justify-between px-10 py-6">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center">
-            <img src={logo} alt="Helpsi Logo" className="h-16 w-auto" />
+    <div className="min-h-screen bg-gradient-primary flex flex-col">
+      <ModernNavbar />
+
+      {/* About Section */}
+      <section className="container mx-auto px-6 py-20 text-center animate-fade-in">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-5xl md:text-7xl font-black text-white mb-8 leading-tight">
+            Sobre a
+            <span className="block bg-gradient-to-r from-white to-primary-glow bg-clip-text text-transparent">
+              HELPSI
+            </span>
+          </h1>
+          <div className="glass-card p-12 max-w-4xl mx-auto text-left">
+            <div className="space-y-6 text-gray-700 text-lg leading-relaxed">
+              <p>
+                Somos uma plataforma inovadora que conecta clientes a especialistas certificados, oferecendo orientação personalizada antes e depois da compra. Nosso objetivo é proporcionar segurança, confiança e resultados reais para quem busca apoio profissional de qualidade.
+              </p>
+              <p>
+                Nossos diferenciais incluem atendimento humanizado, tecnologia própria de videoconferência, flexibilidade de horários e profissionais com CRP ativo. Acreditamos que o acesso à informação e ao suporte especializado transforma vidas e negócios.
+              </p>
+              <div className="grid md:grid-cols-2 gap-8 mt-8">
+                <div className="space-y-4">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Nossa Missão</h3>
+                  <p>
+                    Democratizar o acesso a consultoria especializada, conectando pessoas a profissionais qualificados de forma simples, segura e eficiente.
+                  </p>
+                </div>
+                <div className="space-y-4">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Nossa Visão</h3>
+                  <p>
+                    Ser a principal plataforma de consultoria online do Brasil, reconhecida pela qualidade dos profissionais e excelência no atendimento.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        {/* Centralizar links principais */}
-        <div className="flex-1 flex justify-center gap-8 items-center text-white font-medium">
-          <Link to="/" className={`hover:text-pink-300 transition ${location.pathname === '/' ? 'lamp-effect' : ''}`}>Home</Link>
-          <Link to="/about" className={`hover:text-pink-300 transition ${location.pathname === '/about' ? 'lamp-effect' : ''}`}>Sobre</Link>
-          <Link to="/contact" className={`hover:text-pink-300 transition ${location.pathname === '/contact' ? 'lamp-effect' : ''}`}>Contato</Link>
-          {user && (
-            <>
-              <Link to="/schedule" className={`hover:text-pink-300 transition ${location.pathname === '/schedule' ? 'lamp-effect' : ''}`}>Agendar</Link>
-              <Link to="/client-area" className={`hover:text-pink-300 transition ${location.pathname === '/client-area' ? 'lamp-effect' : ''}`}>Área do Cliente</Link>
-            </>
-          )}
-        </div>
-        {/* Botão de perfil/menu à direita */}
-        <div className="flex gap-4 items-center">
-          {!user ? (
-            <>
-              <Link to="/auth">
-                <button className="px-4 py-2 rounded-lg bg-white/80 text-pink-500 font-bold hover:bg-white">Login</button>
-              </Link>
-              <Link to="/auth">
-                <button className="px-4 py-2 rounded-lg bg-pink-400 text-white font-bold hover:bg-pink-500">Cadastrar</button>
-              </Link>
-            </>
-          ) :
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <PulsatingButton
-                  pulseColor="#f472b6"
-                  className="bg-white/80 text-pink-500 font-bold hover:bg-white"
-                >
-                  {profile?.full_name || 'Perfil'}
-                </PulsatingButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {profile?.role === 'admin' ? (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin">Painel Administrativo</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
-                  </>
-                ) : (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link to="/client-area">Área do Cliente</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          }
-        </div>
-      </nav>
+      </section>
 
-      <div className="container mx-auto px-4 py-16 flex-1 flex flex-col items-center justify-center">
-        <h1 className="text-4xl font-extrabold text-white mb-6 drop-shadow-lg text-center">Sobre Nós</h1>
-        <div className="max-w-xl w-full bg-white/80 rounded-xl shadow-lg p-8 text-gray-800 text-lg mt-0">
-          <p>
-            Somos uma plataforma inovadora que conecta clientes a especialistas certificados, oferecendo orientação personalizada antes e depois da compra. Nosso objetivo é proporcionar segurança, confiança e resultados reais para quem busca apoio profissional de qualidade.
-          </p>
-          <p className="mt-4">
-            Nossos diferenciais incluem atendimento humanizado, tecnologia própria de videoconferência, flexibilidade de horários e profissionais com CRP ativo. Acreditamos que o acesso à informação e ao suporte especializado transforma vidas e negócios.
-          </p>
-        </div>
-      </div>
-
-      {/* Nuvens rodapé */}
-      <div className="w-full h-32 relative">
+      {/* Footer Wave */}
+      <div className="w-full h-32 relative mt-auto">
         <svg className="absolute bottom-0 left-0 w-full" height="100" viewBox="0 0 1440 100" fill="none">
           <path
             d="M0 40C360 80 1080 0 1440 40V100H0V40Z"
@@ -109,4 +56,4 @@ const About = () => {
   );
 };
 
-export default About; 
+export default About;

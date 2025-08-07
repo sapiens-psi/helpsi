@@ -1,23 +1,15 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { PulsatingButton } from '@/components/magicui/pulsating-button';
-import { useAuth } from '@/hooks/useAuth';
-import { useProfile } from '@/hooks/useProfile';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import logo from '@/assets/helpsilogo.png';
+import { ModernNavbar } from '@/components/ModernNavbar';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Mail, Phone, MapPin } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Contact = () => {
-  const { user, signOut } = useAuth();
-  const { data: profile } = useProfile();
   const [form, setForm] = useState({ name: '', email: '', message: '' });
   const [sent, setSent] = useState(false);
-  const location = useLocation();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -26,130 +18,141 @@ const Contact = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSent(true);
+    toast.success('Mensagem enviada com sucesso! Entraremos em contato em breve.');
     // Aqui você pode integrar com backend/email
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#7b2ff2] via-[#f357a8] to-[#0a223a] flex flex-col">
-      {/* Navbar */}
-      <nav className="flex items-center justify-between px-10 py-6">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center">
-            <img src={logo} alt="Helpsi Logo" className="h-16 w-auto" />
+    <div className="min-h-screen bg-gradient-primary flex flex-col">
+      <ModernNavbar />
+
+      {/* Contact Section */}
+      <section className="container mx-auto px-6 py-20 text-center animate-fade-in">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-5xl md:text-7xl font-black text-white mb-8 leading-tight">
+            Entre em
+            <span className="block bg-gradient-to-r from-white to-primary-glow bg-clip-text text-transparent">
+              Contato
+            </span>
+          </h1>
+          <p className="text-white/80 text-xl md:text-2xl mb-10 max-w-3xl mx-auto leading-relaxed">
+            Estamos aqui para ajudar! Entre em contato conosco e tire todas as suas dúvidas.
+          </p>
+        </div>
+      </section>
+
+      {/* Contact Form and Info */}
+      <section className="container mx-auto px-6 py-20">
+        <div className="grid md:grid-cols-2 gap-12 max-w-6xl mx-auto">
+          {/* Contact Form */}
+          <div className="glass-card p-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-6">Envie sua Mensagem</h2>
+            {sent ? (
+              <div className="text-center p-8">
+                <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
+                  <strong>Sucesso!</strong> Mensagem enviada com sucesso! Entraremos em contato em breve.
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-gray-700 font-medium">Nome</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    type="text"
+                    value={form.name}
+                    onChange={handleChange}
+                    required
+                    className="border-gray-300 focus:border-primary"
+                    placeholder="Seu nome completo"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-gray-700 font-medium">E-mail</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    required
+                    className="border-gray-300 focus:border-primary"
+                    placeholder="seu@email.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="message" className="text-gray-700 font-medium">Mensagem</Label>
+                  <Textarea
+                    id="message"
+                    name="message"
+                    value={form.message}
+                    onChange={handleChange}
+                    required
+                    rows={5}
+                    className="border-gray-300 focus:border-primary"
+                    placeholder="Como podemos ajudar você?"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-3"
+                >
+                  Enviar Mensagem
+                </Button>
+              </form>
+            )}
+          </div>
+
+          {/* Contact Info */}
+          <div className="space-y-8">
+            <div className="glass-card p-8">
+              <h2 className="text-3xl font-bold text-gray-900 mb-6">Informações de Contato</h2>
+              <div className="space-y-6">
+                <div className="flex items-start space-x-4">
+                  <div className="bg-gradient-to-br from-primary to-primary/80 w-12 h-12 rounded-lg flex items-center justify-center">
+                    <Mail className="text-white h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">E-mail</h3>
+                    <p className="text-gray-600">contato@helpsi.com.br</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-4">
+                  <div className="bg-gradient-to-br from-secondary to-secondary/80 w-12 h-12 rounded-lg flex items-center justify-center">
+                    <Phone className="text-white h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Telefone</h3>
+                    <p className="text-gray-600">(11) 9999-9999</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-4">
+                  <div className="bg-gradient-to-br from-accent to-accent/80 w-12 h-12 rounded-lg flex items-center justify-center">
+                    <MapPin className="text-white h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Endereço</h3>
+                    <p className="text-gray-600">São Paulo, SP - Brasil</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-card p-8">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Horário de Atendimento</h3>
+              <div className="space-y-2 text-gray-600">
+                <p><strong>Segunda a Sexta:</strong> 8h às 18h</p>
+                <p><strong>Sábado:</strong> 9h às 15h</p>
+                <p><strong>Domingo:</strong> Fechado</p>
+              </div>
+            </div>
           </div>
         </div>
-        {/* Centralizar links principais */}
-        <div className="flex-1 flex justify-center gap-8 items-center text-white font-medium">
-          <Link to="/" className={`hover:text-pink-300 transition ${location.pathname === '/' ? 'lamp-effect' : ''}`}>Home</Link>
-          <Link to="/about" className={`hover:text-pink-300 transition ${location.pathname === '/about' ? 'lamp-effect' : ''}`}>Sobre</Link>
-          <Link to="/contact" className={`hover:text-pink-300 transition ${location.pathname === '/contact' ? 'lamp-effect' : ''}`}>Contato</Link>
-          {user && (
-            <>
-              <Link to="/schedule" className={`hover:text-pink-300 transition ${location.pathname === '/schedule' ? 'lamp-effect' : ''}`}>Agendar</Link>
-              <Link to="/client-area" className={`hover:text-pink-300 transition ${location.pathname === '/client-area' ? 'lamp-effect' : ''}`}>Área do Cliente</Link>
-            </>
-          )}
-        </div>
-        {/* Botão de perfil/menu à direita */}
-        <div className="flex gap-4 items-center">
-          {!user ? (
-            <>
-              <Link to="/auth">
-                <button className="px-4 py-2 rounded-lg bg-white/80 text-pink-500 font-bold hover:bg-white">Login</button>
-              </Link>
-              <Link to="/auth">
-                <button className="px-4 py-2 rounded-lg bg-pink-400 text-white font-bold hover:bg-pink-500">Cadastrar</button>
-              </Link>
-            </>
-          ) :
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <PulsatingButton
-                  pulseColor="#f472b6"
-                  className="bg-white/80 text-pink-500 font-bold hover:bg-white"
-                >
-                  {profile?.full_name || 'Perfil'}
-                </PulsatingButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {profile?.role === 'admin' ? (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin">Painel Administrativo</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
-                  </>
-                ) : (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link to="/client-area">Área do Cliente</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>Sair</DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          }
-        </div>
-      </nav>
+      </section>
 
-      <div className="container mx-auto px-4 py-16 flex-1 flex flex-col items-center justify-center">
-        <h1 className="text-4xl font-extrabold text-white mb-6 drop-shadow-lg">Contato</h1>
-        <div className="max-w-xl w-full bg-white/80 rounded-xl shadow-lg p-8 text-gray-800">
-          {sent ? (
-            <div className="text-center text-green-600 font-semibold text-lg">
-              Mensagem enviada com sucesso! Entraremos em contato em breve.
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium mb-1">Nome</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={form.name}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 rounded-lg border border-pink-200 focus:border-pink-400 focus:outline-none bg-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">E-mail</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={form.email}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 rounded-lg border border-pink-200 focus:border-pink-400 focus:outline-none bg-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Mensagem</label>
-                <textarea
-                  name="message"
-                  value={form.message}
-                  onChange={handleChange}
-                  required
-                  rows={5}
-                  className="w-full px-4 py-2 rounded-lg border border-pink-200 focus:border-pink-400 focus:outline-none bg-white"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 rounded-lg transition"
-              >
-                Enviar Mensagem
-              </button>
-            </form>
-          )}
-        </div>
-      </div>
-
-      {/* Nuvens rodapé */}
-      <div className="w-full h-32 relative">
+      {/* Footer Wave */}
+      <div className="w-full h-32 relative mt-auto">
         <svg className="absolute bottom-0 left-0 w-full" height="100" viewBox="0 0 1440 100" fill="none">
           <path
             d="M0 40C360 80 1080 0 1440 40V100H0V40Z"
@@ -162,4 +165,4 @@ const Contact = () => {
   );
 };
 
-export default Contact; 
+export default Contact;

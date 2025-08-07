@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Settings, Clock, Save } from 'lucide-react';
+import { Settings, Clock, Save, Plus, Trash2, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -18,39 +18,42 @@ type DiasSemana = {
   sunday: boolean;
 };
 
-type Horarios = {
-  intervaloAlmoco: boolean;
-  inicioAlmoco: string;
-  fimAlmoco: string;
+type TimeSlot = {
+  id?: string;
+  start_time: string;
+  max_consultations: number;
+  is_active: boolean;
 };
 
-type BusinessHours = {
-  [key: string]: [string, string]; // Ex: monday: ['08:00', '18:00']
+type DaySchedule = {
+  [key: string]: TimeSlot[];
 };
 
 type ConfigAgendaType = {
   id?: string;
   diasSemana: DiasSemana;
-  horarios: Horarios;
-  business_hours: BusinessHours;
   duracaoConsulta: number;
   intervaloEntreConsultas: number;
+  daySchedules: DaySchedule;
 };
 
 const defaultConfig: ConfigAgendaType = {
   diasSemana: {
     monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false, sunday: false
   },
-  horarios: {
-    intervaloAlmoco: false,
-    inicioAlmoco: '',
-    fimAlmoco: ''
-  },
-  business_hours: {
-    monday: ['08:00', '18:00']
-  },
   duracaoConsulta: 30,
-  intervaloEntreConsultas: 15
+  intervaloEntreConsultas: 15,
+  daySchedules: {}
+};
+
+const dayNames = {
+  monday: 'Segunda-feira',
+  tuesday: 'Terça-feira',
+  wednesday: 'Quarta-feira',
+  thursday: 'Quinta-feira',
+  friday: 'Sexta-feira',
+  saturday: 'Sábado',
+  sunday: 'Domingo'
 };
 
 const ConfigAgenda = () => {
@@ -59,37 +62,72 @@ const ConfigAgenda = () => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    async function fetchConfig() {
-      setLoading(true);
-      const { data, error } = await supabase.from('schedule_config').select('*').single();
-      if (data) {
-        const safeConfig: ConfigAgendaType = {
-          id: data.id,
-          diasSemana: data.diasSemana ? 
-            (typeof data.diasSemana === 'object' && data.diasSemana !== null ? 
-              JSON.parse(typeof data.diasSemana === 'string' ? data.diasSemana : JSON.stringify(data.diasSemana)) : 
-              defaultConfig.diasSemana) : 
-            defaultConfig.diasSemana,
-          horarios: data.horarios ? 
-            (typeof data.horarios === 'object' && data.horarios !== null ? 
-              JSON.parse(typeof data.horarios === 'string' ? data.horarios : JSON.stringify(data.horarios)) : 
-              defaultConfig.horarios) : 
-            defaultConfig.horarios,
-          business_hours: data.business_hours ? 
-            (typeof data.business_hours === 'object' && data.business_hours !== null ? 
-              JSON.parse(typeof data.business_hours === 'string' ? data.business_hours : JSON.stringify(data.business_hours)) : 
-              defaultConfig.business_hours) : 
-            defaultConfig.business_hours,
-          duracaoConsulta: typeof data.duracaoConsulta === 'number' ? data.duracaoConsulta : defaultConfig.duracaoConsulta,
-          intervaloEntreConsultas: typeof data.intervaloEntreConsultas === 'number' ? data.intervaloEntreConsultas : defaultConfig.intervaloEntreConsultas
-        };
-        setConfig(safeConfig);
-      }
-      setLoading(false);
-      if (error) toast.error('Erro ao carregar configuração de agenda: ' + (error.message || JSON.stringify(error)));
-    }
     fetchConfig();
   }, []);
+
+  const fetchConfig = async () => {
+    setLoading(true);
+    try {
+      // Buscar configuração principal de pós-compra
+      const { data: configData, error: configError } = await supabase
+        .from('schedule_config_pos_compra')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (configError && configError.code !== 'PGRST116') {
+        throw configError;
+      }
+
+      // Buscar slots de horários específicos para pós-compra
+      const { data: slotsData, error: slotsError } = await supabase
+        .from('schedule_slots_pos_compra')
+        .select('*')
+        .eq('is_active', true)
+        .order('day_of_week')
+        .order('start_time');
+
+      if (slotsError) {
+        throw slotsError;
+      }
+
+      // Organizar dados
+      const daySchedules: DaySchedule = {};
+      if (slotsData) {
+        slotsData.forEach(slot => {
+          if (!daySchedules[slot.day_of_week]) {
+            daySchedules[slot.day_of_week] = [];
+          }
+          daySchedules[slot.day_of_week].push({
+            id: slot.id,
+            start_time: slot.start_time,
+            max_consultations: slot.max_consultations,
+            is_active: slot.is_active
+          });
+        });
+      }
+
+      if (configData) {
+        setConfig({
+          id: configData.id,
+          diasSemana: configData.diasSemana ? 
+            (typeof configData.diasSemana === 'object' ? configData.diasSemana : JSON.parse(configData.diasSemana)) : 
+            defaultConfig.diasSemana,
+          duracaoConsulta: configData.duracaoConsulta || defaultConfig.duracaoConsulta,
+          intervaloEntreConsultas: configData.intervaloEntreConsultas || defaultConfig.intervaloEntreConsultas,
+          daySchedules
+        });
+      } else {
+        setConfig({ ...defaultConfig, daySchedules });
+      }
+    } catch (error: any) {
+      console.error('Erro ao carregar configuração:', error);
+      toast.error('Erro ao carregar configuração: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDiaChange = (dia: string, ativo: boolean) => {
     setConfig(prev => ({
@@ -98,30 +136,114 @@ const ConfigAgenda = () => {
     }));
   };
 
-  const handleHorarioChange = (campo: string, valor: string) => {
+  const addTimeSlot = (dayOfWeek: string) => {
     setConfig(prev => ({
       ...prev,
-      horarios: { ...prev.horarios, [campo]: valor }
+      daySchedules: {
+        ...prev.daySchedules,
+        [dayOfWeek]: [
+          ...(prev.daySchedules[dayOfWeek] || []),
+          {
+            start_time: '09:00',
+            max_consultations: 1,
+            is_active: true
+          }
+        ]
+      }
+    }));
+  };
+
+  const removeTimeSlot = (dayOfWeek: string, index: number) => {
+    setConfig(prev => ({
+      ...prev,
+      daySchedules: {
+        ...prev.daySchedules,
+        [dayOfWeek]: prev.daySchedules[dayOfWeek]?.filter((_, i) => i !== index) || []
+      }
+    }));
+  };
+
+  const updateTimeSlot = (dayOfWeek: string, index: number, field: string, value: any) => {
+    setConfig(prev => ({
+      ...prev,
+      daySchedules: {
+        ...prev.daySchedules,
+        [dayOfWeek]: prev.daySchedules[dayOfWeek]?.map((slot, i) => 
+          i === index ? { ...slot, [field]: value } : slot
+        ) || []
+      }
     }));
   };
 
   const handleSave = async () => {
     setSaving(true);
-    const { id, diasSemana, horarios, business_hours, duracaoConsulta, intervaloEntreConsultas } = config;
-    // Serializar campos JSON
-    const upsertData = {
-      id: id || undefined,
-      diasSemana: diasSemana ? JSON.stringify(diasSemana) : undefined,
-      horarios: horarios ? JSON.stringify(horarios) : undefined,
-      business_hours: business_hours ? JSON.stringify(business_hours) : undefined,
-      duracaoConsulta,
-      intervaloEntreConsultas
-    };
-    const { error } = await supabase.from('schedule_config').upsert(upsertData, { onConflict: 'id' });
-    setSaving(false);
-    if (error) toast.error('Erro ao salvar configuração: ' + (error.message || JSON.stringify(error)));
-    else toast.success('Configuração salva!');
+    try {
+      // Salvar configuração principal
+      const configData = {
+        id: config.id,
+        diasSemana: JSON.stringify(config.diasSemana),
+        duracaoConsulta: config.duracaoConsulta,
+        intervaloEntreConsultas: config.intervaloEntreConsultas
+      };
+
+      const { data: savedConfig, error: configError } = await supabase
+        .from('schedule_config_pos_compra')
+        .upsert(configData, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (configError) throw configError;
+
+      // Remover slots existentes de pós-compra para este config_id
+      const { error: deleteError } = await supabase
+        .from('schedule_slots_pos_compra')
+        .delete()
+        .eq('config_id', savedConfig.id);
+
+      if (deleteError) throw deleteError;
+
+      // Inserir novos slots
+      const slotsToInsert = [];
+      for (const [dayOfWeek, slots] of Object.entries(config.daySchedules)) {
+        if (config.diasSemana[dayOfWeek as keyof DiasSemana]) {
+          for (const slot of slots) {
+            slotsToInsert.push({
+              config_id: savedConfig.id,
+              day_of_week: dayOfWeek, // dayOfWeek já é uma string como 'monday', 'tuesday', etc.
+              start_time: slot.start_time,
+              max_consultations: slot.max_consultations,
+              is_active: slot.is_active
+            });
+          }
+        }
+      }
+
+      if (slotsToInsert.length > 0) {
+        const { error: slotsError } = await supabase
+          .from('schedule_slots_pos_compra')
+          .insert(slotsToInsert);
+
+        if (slotsError) throw slotsError;
+      }
+
+      toast.success('Configuração de pós-compra salva com sucesso!');
+      await fetchConfig(); // Recarregar dados
+    } catch (error: any) {
+      console.error('Erro ao salvar:', error);
+      toast.error('Erro ao salvar configuração: ' + error.message);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold text-gray-900">Configurações de Agenda - Pós-Compra</h1>
+        <div className="text-center text-gray-500 py-8">Carregando configuração...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -137,94 +259,16 @@ const ConfigAgenda = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="text-center text-gray-500 py-8">Carregando configuração...</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {Object.entries(config.diasSemana).map(([dia, ativo]) => (
-                  <div key={dia} className="flex items-center justify-between p-3 border rounded-lg">
-                    <span className="capitalize">{dia}</span>
-                    <Switch
-                      checked={ativo}
-                      onCheckedChange={(checked) => handleDiaChange(dia, checked)}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Horários */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Clock className="mr-2 h-5 w-5" />
-              Horários de Funcionamento
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Horário de Início</label>
-                <Input
-                  type="time"
-                  value={config?.business_hours?.monday?.[0] || ''}
-                  onChange={e => setConfig((prev: any) => ({
-                    ...prev,
-                    business_hours: { ...prev.business_hours, monday: [e.target.value, prev.business_hours?.monday?.[1] || '18:00'] }
-                  }))}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-2">Horário de Fim</label>
-                <Input
-                  type="time"
-                  value={config?.business_hours?.monday?.[1] || ''}
-                  onChange={e => setConfig((prev: any) => ({
-                    ...prev,
-                    business_hours: { ...prev.business_hours, monday: [prev.business_hours?.monday?.[0] || '08:00', e.target.value] }
-                  }))}
-                />
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <div className="flex items-center justify-between mb-4">
-                <span className="font-medium">Intervalo para Almoço</span>
-                <Switch
-                  checked={config?.horarios?.intervaloAlmoco}
-                  onCheckedChange={(checked) => 
-                    setConfig(prev => ({
-                      ...prev,
-                      horarios: { ...prev.horarios, intervaloAlmoco: checked }
-                    }))
-                  }
-                />
-              </div>
-              
-              {config?.horarios?.intervaloAlmoco && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Início do Almoço</label>
-                    <Input
-                      type="time"
-                      value={config?.horarios?.inicioAlmoco}
-                      onChange={(e) => handleHorarioChange('inicioAlmoco', e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Fim do Almoço</label>
-                    <Input
-                      type="time"
-                      value={config?.horarios?.fimAlmoco}
-                      onChange={(e) => handleHorarioChange('fimAlmoco', e.target.value)}
-                    />
-                  </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Object.entries(config.diasSemana).map(([dia, ativo]) => (
+                <div key={dia} className="flex items-center justify-between p-3 border rounded-lg">
+                  <span className="capitalize">{dayNames[dia as keyof typeof dayNames]}</span>
+                  <Switch
+                    checked={ativo}
+                    onCheckedChange={(checked) => handleDiaChange(dia, checked)}
+                  />
                 </div>
-              )}
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -232,10 +276,13 @@ const ConfigAgenda = () => {
         {/* Configurações de Consulta */}
         <Card>
           <CardHeader>
-            <CardTitle>Configurações de Consulta</CardTitle>
+            <CardTitle className="flex items-center">
+              <Clock className="mr-2 h-5 w-5" />
+              Configurações de Consulta
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Duração da Consulta (minutos)</label>
                 <Input
@@ -244,22 +291,101 @@ const ConfigAgenda = () => {
                   onChange={(e) => setConfig(prev => ({ ...prev, duracaoConsulta: parseInt(e.target.value) || 30 }))}
                 />
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-2">Intervalo Entre Consultas (minutos)</label>
-                <Input
-                  type="number"
-                  value={config.intervaloEntreConsultas}
-                  onChange={(e) => setConfig(prev => ({ ...prev, intervaloEntreConsultas: parseInt(e.target.value) || 15 }))}
-                />
-              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Button type="submit" onClick={handleSave} className="w-full md:w-auto" disabled={saving}>
-          {saving ? 'Salvando...' : <Save className="mr-2 h-4 w-4" />}
-          Salvar Configurações
+        {/* Horários Específicos por Dia */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Calendar className="mr-2 h-5 w-5" />
+              Horários Específicos por Dia - Pós-Compra
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {Object.entries(config.diasSemana)
+              .filter(([_, ativo]) => ativo)
+              .map(([dayOfWeek]) => (
+                <div key={dayOfWeek} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-medium text-lg">{dayNames[dayOfWeek as keyof typeof dayNames]}</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addTimeSlot(dayOfWeek)}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Adicionar Horário
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {(config.daySchedules[dayOfWeek] || []).map((slot, index) => (
+                      <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium mb-1">Horário</label>
+                          <Input
+                            type="time"
+                            value={slot.start_time}
+                            onChange={(e) => updateTimeSlot(dayOfWeek, index, 'start_time', e.target.value)}
+                          />
+                        </div>
+                        
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium mb-1">Máx. Consultas</label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="10"
+                            value={slot.max_consultations}
+                            onChange={(e) => updateTimeSlot(dayOfWeek, index, 'max_consultations', parseInt(e.target.value) || 1)}
+                          />
+                        </div>
+                        
+                        <div className="flex items-center">
+                          <Switch
+                            checked={slot.is_active}
+                            onCheckedChange={(checked) => updateTimeSlot(dayOfWeek, index, 'is_active', checked)}
+                          />
+                        </div>
+                        
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeTimeSlot(dayOfWeek, index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    
+                    {(!config.daySchedules[dayOfWeek] || config.daySchedules[dayOfWeek].length === 0) && (
+                      <div className="text-center text-gray-500 py-4">
+                        Nenhum horário configurado para este dia
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            }
+          </CardContent>
+        </Card>
+
+        <Button 
+          type="submit" 
+          onClick={handleSave} 
+          className="w-full md:w-auto" 
+          disabled={saving}
+        >
+          {saving ? 'Salvando...' : (
+            <>
+              <Save className="mr-2 h-4 w-4" />
+              Salvar Configurações
+            </>
+          )}
         </Button>
       </div>
     </div>

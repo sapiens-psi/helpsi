@@ -28,6 +28,7 @@ import SalasPreVenda from "./pages/admin/SalasPreVenda";
 import Especialistas from "./pages/admin/Especialistas";
 import PerfilEmpresa from "./pages/admin/PerfilEmpresa";
 import ConfigAgenda from "./pages/admin/ConfigAgenda";
+import ConfigAgendaPreCompra from "./pages/admin/ConfigAgendaPreCompra";
 import AgendaPosVenda from "./pages/admin/AgendaPosVenda";
 import AgendaPreVenda from "./pages/admin/AgendaPreVenda";
 import Clientes from "./pages/admin/Clientes";
@@ -111,6 +112,7 @@ const App = () => (
               <Route path="especialistas" element={<Especialistas />} />
               <Route path="perfil-empresa" element={<PerfilEmpresa />} />
               <Route path="config-agenda" element={<ConfigAgenda />} />
+              <Route path="config-agenda-pre-compra" element={<ConfigAgendaPreCompra />} />
               <Route path="agenda-pos-venda" element={<AgendaPosVenda />} />
               <Route path="agenda-pre-venda" element={<AgendaPreVenda />} />
               <Route path="clientes" element={<Clientes />} />

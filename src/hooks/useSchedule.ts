@@ -3,12 +3,68 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export function useScheduleConfig() {
+export function useAvailableSlots(date: string, scheduleType: 'pre-compra' | 'pos-compra') {
   return useQuery({
-    queryKey: ['schedule-config'],
+    queryKey: ['available-slots', date, scheduleType],
     queryFn: async () => {
+      if (!date) return { slots: [] };
+      
+      const { data, error } = await supabase.functions.invoke('check-availability', {
+        body: {
+          date,
+          scheduleType: scheduleType === 'pre-compra' ? 'pre_compra' : 'pos_compra',
+          action: 'get_available_slots'
+        }
+      });
+
+      if (error) {
+        console.error('Error fetching available slots:', error);
+        throw new Error(error.message || 'Erro ao buscar horários disponíveis');
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      return data || { slots: [] };
+    },
+    enabled: !!date
+  });
+}
+
+export function useCheckSlotAvailability() {
+  return useMutation({
+    mutationFn: async ({ date, time, scheduleType }: { date: string; time: string; scheduleType: 'pre-compra' | 'pos-compra' }) => {
+      const { data, error } = await supabase.functions.invoke('check-availability', {
+        body: {
+          date,
+          time,
+          scheduleType: scheduleType === 'pre-compra' ? 'pre_compra' : 'pos_compra',
+          action: 'check_slot_availability'
+        }
+      });
+
+      if (error) {
+        console.error('Error checking slot availability:', error);
+        throw new Error(error.message || 'Erro ao verificar disponibilidade');
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      return data;
+    }
+  });
+}
+
+export function useScheduleConfig(type: 'pre-compra' | 'pos-compra' = 'pos-compra') {
+  return useQuery({
+    queryKey: ['schedule-config', type],
+    queryFn: async () => {
+      const tableName = type === 'pre-compra' ? 'schedule_config_pre_compra' : 'schedule_config_pos_compra';
       const { data, error } = await supabase
-        .from('schedule_config')
+        .from(tableName)
         .select('*')
         .single();
       if (error && error.code !== 'PGRST116') throw error;
@@ -22,41 +78,46 @@ export function useCreateConsultation() {
   
   return useMutation({
     mutationFn: async (consultationData: any) => {
-      // Primeiro, criar a consulta
-      const { data: consultation, error: consultationError } = await supabase
-        .from('consultations')
-        .insert({
-          client_id: consultationData.client_id,
-          type: consultationData.type,
-          scheduled_date: consultationData.scheduled_date,
-          scheduled_time: consultationData.scheduled_time,
-          description: consultationData.description,
-          status: 'agendada'
-        })
-        .select()
-        .single();
+      // Log session info for debugging
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Current session:', session);
+      console.log('Access token:', session?.access_token);
+      console.log('User ID:', session?.user?.id);
+      
+      // Usar a Edge Function create-consultation para criar a consulta com validação
+      const requestBody = {
+        client_id: consultationData.client_id,
+        scheduled_date: consultationData.scheduled_date,
+        scheduled_time: consultationData.scheduled_time,
+        description: consultationData.description,
+        duration_minutes: consultationData.duration_minutes || 60,
+        type: consultationData.type
+      };
 
-      if (consultationError) throw consultationError;
+      // Add coupon fields if provided
+      if (consultationData.coupon_code_used) {
+        requestBody.coupon_code_used = consultationData.coupon_code_used;
+      }
+      if (consultationData.coupon_id) {
+        requestBody.coupon_id = consultationData.coupon_id;
+      }
 
-      // Criar a sala automaticamente
-      const roomToken = `room-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const { data: room, error: roomError } = await supabase
-        .from('meeting_rooms')
-        .insert({
-          consultation_id: consultation.id,
-          room_token: roomToken,
-          name: `Consulta ${consultationData.type}`,
-          description: consultationData.description || 'Consulta agendada',
-          type: consultationData.type,
-          scheduled_at: `${consultationData.scheduled_date}T${consultationData.scheduled_time}`,
-          is_active: false
-        })
-        .select()
-        .single();
+      console.log('Sending request body:', requestBody);
 
-      if (roomError) throw roomError;
+      const { data, error } = await supabase.functions.invoke('create-consultation', {
+        body: requestBody
+      });
 
-      return { consultation, room };
+      if (error) {
+        console.error('Error calling create-consultation function:', error);
+        throw new Error(error.message || 'Erro ao criar consulta');
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultations'] });
