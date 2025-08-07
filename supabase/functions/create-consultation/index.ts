@@ -175,14 +175,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Validate time format (HH:MM)
-    const timeRegex = /^\d{2}:\d{2}$/;
+    // Validate time format (HH:MM or HH:MM:SS) and normalize to HH:MM
+    const timeRegex = /^\d{2}:\d{2}(:\d{2})?$/;
     if (!timeRegex.test(scheduled_time)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid time format. Use HH:MM' }),
+        JSON.stringify({ error: 'Invalid time format. Use HH:MM or HH:MM:SS' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    // Normalize time to HH:MM format if it comes as HH:MM:SS
+    const normalizedTime = scheduled_time.length === 8 ? scheduled_time.substring(0, 5) : scheduled_time;
 
     // Determine table name based on schedule type
     const tableName = finalScheduleType === 'pre_compra' ? 'consultations_pre_compra' : 'consultations_pos_compra';
@@ -193,7 +196,7 @@ Deno.serve(async (req: Request) => {
     const consultationData = {
       client_id,
       scheduled_date,
-      scheduled_time,
+      scheduled_time: normalizedTime,
       description,
       duration_minutes: finalDuration,
       status: 'agendada'
@@ -225,8 +228,8 @@ Deno.serve(async (req: Request) => {
 
     // Create meeting room automatically
     const roomToken = `room-${consultation.id}-${Date.now()}`;
-    const roomName = `Consulta ${consultationType} - ${scheduled_date} ${scheduled_time}`;
-    const scheduledAt = `${scheduled_date}T${scheduled_time}:00`;
+    const roomName = `Consulta ${consultationType} - ${scheduled_date} ${normalizedTime}`;
+    const scheduledAt = `${scheduled_date}T${normalizedTime}:00`;
 
     const meetingRoomData = {
       consultation_id: consultation.id,
