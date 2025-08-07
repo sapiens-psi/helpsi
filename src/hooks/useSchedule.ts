@@ -85,7 +85,7 @@ export function useCreateConsultation() {
       console.log('User ID:', session?.user?.id);
       
       // Usar a Edge Function create-consultation para criar a consulta com validação
-      const requestBody = {
+      const requestBody: any = {
         client_id: consultationData.client_id,
         scheduled_date: consultationData.scheduled_date,
         scheduled_time: consultationData.scheduled_time,

@@ -106,7 +106,10 @@ export const ConsultationHistory = ({ showAll = false, maxItems = 5 }: Consultat
   const handleCancelConsultation = async (consultation: any) => {
     if (window.confirm('Tem certeza que deseja cancelar esta consulta?')) {
       try {
-        await cancelConsultation.mutateAsync({ id: consultation.id, type: consultation.type });
+        await cancelConsultation.mutateAsync({ 
+          consultationId: consultation.id, 
+          type: consultation.type 
+        });
       } catch (error) {
         console.error('Erro ao cancelar consulta:', error);
       }
