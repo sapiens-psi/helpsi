@@ -103,10 +103,10 @@ export const ConsultationHistory = ({ showAll = false, maxItems = 5 }: Consultat
     return hoursDifference > 24; // Pode cancelar se faltam mais de 24 horas
   };
 
-  const handleCancelConsultation = async (consultationId: string) => {
+  const handleCancelConsultation = async (consultation: any) => {
     if (window.confirm('Tem certeza que deseja cancelar esta consulta?')) {
       try {
-        await cancelConsultation.mutateAsync(consultationId);
+        await cancelConsultation.mutateAsync({ id: consultation.id, type: consultation.type });
       } catch (error) {
         console.error('Erro ao cancelar consulta:', error);
       }
@@ -135,7 +135,7 @@ export const ConsultationHistory = ({ showAll = false, maxItems = 5 }: Consultat
         <CardContent>
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse">
+              <div key={`loading-skeleton-${i}`} className="animate-pulse">
                 <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
                 <div className="h-4 bg-gray-200 rounded w-1/2"></div>
               </div>
@@ -312,7 +312,7 @@ export const ConsultationHistory = ({ showAll = false, maxItems = 5 }: Consultat
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleCancelConsultation(consultation.id)}
+                          onClick={() => handleCancelConsultation(consultation)}
                           disabled={cancelConsultation.isPending}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50 w-full sm:w-auto"
                         >
