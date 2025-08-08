@@ -15,7 +15,8 @@ import {
   BarChart,
   CreditCard,
   Percent,
-  Ticket
+  Ticket,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,8 @@ const AdminSidebar = () => {
     { path: '/admin/agenda-pre-venda', icon: Calendar, label: 'Agenda Pré-venda' },
     { path: '/admin/clientes', icon: Users, label: 'Clientes' },
     { path: '/admin/discount-coupons', icon: Percent, label: 'Cupons de Desconto' },
-    { path: '/admin/validation-coupons', icon: Ticket, label: 'Cupons de Validação' }
+    { path: '/admin/validation-coupons', icon: Ticket, label: 'Cupons de Validação' },
+    { path: '/admin/pdfs-explicativos', icon: FileText, label: 'PDFs Explicativos' }
   ];
 
   const isActive = (path: string, exact = false) => {

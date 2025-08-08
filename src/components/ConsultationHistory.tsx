@@ -118,8 +118,7 @@ export const ConsultationHistory = ({ showAll = false, maxItems = 5 }: Consultat
 
   const filteredConsultations = consultations.filter(consultation => {
     const matchesSearch = !searchTerm || 
-      consultation.specialist?.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      consultation.specialist?.specialties?.join(', ')?.toLowerCase().includes(searchTerm.toLowerCase());
+      consultation.description?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || consultation.status === statusFilter;
     const matchesType = typeFilter === 'all' || consultation.type === typeFilter;
@@ -253,13 +252,8 @@ export const ConsultationHistory = ({ showAll = false, maxItems = 5 }: Consultat
                       <div className="flex items-center text-sm text-gray-600">
                         <User className="h-4 w-4 mr-2" />
                         <span className="font-medium">
-                          {consultation.specialist?.profiles?.full_name || 'Especialista não informado'}
+                          {consultation.specialist_id ? 'Especialista' : 'Especialista não informado'}
                         </span>
-                        {consultation.specialist?.specialties && (
-                          <span className="ml-2 text-gray-500">
-                            • {consultation.specialist.specialties.join(', ')}
-                          </span>
-                        )}
                       </div>
                       
                       <div className="flex items-center text-sm text-gray-600">
@@ -285,7 +279,7 @@ export const ConsultationHistory = ({ showAll = false, maxItems = 5 }: Consultat
                         const isRoomAvailable = now >= fiveMinutesBefore;
                         
                         return isRoomAvailable ? (
-                          <Link to={`/video-conference/${consultation.id}`}>
+                          <Link to={`/conference/${consultation.meeting_room_id}`}>
                             <Button size="sm" className="bg-green-500 hover:bg-green-600 w-full sm:w-auto">
                               <Video className="h-4 w-4 mr-2" />
                               Entrar na Sala
