@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { User, Calendar, Clock, MessageCircle, Video, Mic, PhoneOff, Monitor, CircleDot, Volume2 } from 'lucide-react';
+import { User, Calendar, Clock, MessageCircle, Video, Mic, PhoneOff, Monitor, Volume2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ChevronDown } from 'lucide-react';
 import './VideoConference.css';
@@ -12,31 +12,29 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
+interface PeerConnection {
+  userId: string;
+  connection: RTCPeerConnection;
+  stream?: MediaStream;
+}
+
 const VideoConference = () => {
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isAudioOn, setIsAudioOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordedChunks, setRecordedChunks] = useState<any[]>([]);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [chatMessage, setChatMessage] = useState('');
   const [chatMessages, setChatMessages] = useState<any[]>([]);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const screenVideoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [meetingInfo] = useState({
-    client: 'João Silva',
-    specialist: 'Dra. Maria Santos',
-    type: 'Pós-Compra',
-    duration: '15 minutos',
-    startTime: '14:00'
-  });
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const screenShareRef = useRef<HTMLVideoElement>(null);
+  
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [peerConnections, setPeerConnections] = useState<Map<string, PeerConnection>>(new Map());
 
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string | undefined>(undefined);
-
   const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState<string | undefined>(undefined);
 
@@ -48,10 +46,15 @@ const VideoConference = () => {
   
   // Realtime states
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
-  const [connectedUsers, setConnectedUsers] = useState<string[]>([]);
-  const [remoteVideoEnabled, setRemoteVideoEnabled] = useState(false);
-  const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(false);
-  const [remoteScreenSharing, setRemoteScreenSharing] = useState(false);
+  const [connectedUsers, setConnectedUsers] = useState<Set<string>>(new Set());
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, { video: boolean; audio: boolean; screen: boolean }>>(new Map());
+
+  // ICE servers configuration for better connectivity
+  const iceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ];
 
   // Buscar informações da sala
   const { data: room, isLoading: isLoadingRoom } = useQuery({
@@ -68,6 +71,163 @@ const VideoConference = () => {
     },
     enabled: !!roomId,
   });
+
+  // Initialize local media stream
+  const initializeLocalStream = useCallback(async () => {
+    try {
+      const constraints: MediaStreamConstraints = {
+        video: isVideoOn,
+        audio: selectedAudioDeviceId ? 
+          { deviceId: { exact: selectedAudioDeviceId } } : 
+          isAudioOn
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setLocalStream(stream);
+      
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+
+      // Update existing peer connections with new stream
+      peerConnections.forEach((peerConn) => {
+        const senders = peerConn.connection.getSenders();
+        stream.getTracks().forEach(track => {
+          const sender = senders.find(s => s.track?.kind === track.kind);
+          if (sender) {
+            sender.replaceTrack(track);
+          } else {
+            peerConn.connection.addTrack(track, stream);
+          }
+        });
+      });
+
+      return stream;
+    } catch (error) {
+      console.error('Error accessing media devices:', error);
+      return null;
+    }
+  }, [isVideoOn, isAudioOn, selectedAudioDeviceId, peerConnections]);
+
+  // Create peer connection
+  const createPeerConnection = useCallback((userId: string): RTCPeerConnection => {
+    const peerConnection = new RTCPeerConnection({ iceServers });
+
+    // Handle incoming stream
+    peerConnection.ontrack = (event) => {
+      console.log('Received remote stream from:', userId);
+      const [remoteStream] = event.streams;
+      const videoElement = remoteVideoRefs.current.get(userId);
+      if (videoElement) {
+        videoElement.srcObject = remoteStream;
+      }
+    };
+
+    // Handle ICE candidates
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate && channel) {
+        channel.send({
+          type: 'broadcast',
+          event: 'ice-candidate',
+          payload: {
+            candidate: event.candidate,
+            targetUserId: userId,
+            fromUserId: profile?.id
+          }
+        });
+      }
+    };
+
+    // Handle connection state changes
+    peerConnection.onconnectionstatechange = () => {
+      console.log(`Connection state with ${userId}:`, peerConnection.connectionState);
+      if (peerConnection.connectionState === 'failed') {
+        console.log('Connection failed, attempting to restart ICE');
+        peerConnection.restartIce();
+      }
+    };
+
+    return peerConnection;
+  }, [channel, profile?.id]);
+
+  // Handle WebRTC signaling
+  const handleSignaling = useCallback(async (payload: any) => {
+    const { fromUserId, offer, answer, candidate } = payload;
+    
+    if (!fromUserId || fromUserId === profile?.id) return;
+
+    let peerConn = peerConnections.get(fromUserId);
+    
+    if (!peerConn) {
+      const connection = createPeerConnection(fromUserId);
+      peerConn = { userId: fromUserId, connection };
+      setPeerConnections(prev => new Map(prev).set(fromUserId, peerConn!));
+      
+      // Add local stream to the connection
+      if (localStream) {
+        localStream.getTracks().forEach(track => {
+          connection.addTrack(track, localStream);
+        });
+      }
+    }
+
+    if (offer) {
+      await peerConn.connection.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await peerConn.connection.createAnswer();
+      await peerConn.connection.setLocalDescription(answer);
+      
+      if (channel) {
+        channel.send({
+          type: 'broadcast',
+          event: 'webrtc-answer',
+          payload: {
+            answer,
+            targetUserId: fromUserId,
+            fromUserId: profile?.id
+          }
+        });
+      }
+    }
+
+    if (answer) {
+      await peerConn.connection.setRemoteDescription(new RTCSessionDescription(answer));
+    }
+
+    if (candidate) {
+      await peerConn.connection.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+  }, [peerConnections, createPeerConnection, localStream, channel, profile?.id]);
+
+  // Initialize offer to new user
+  const initiateCall = useCallback(async (targetUserId: string) => {
+    if (targetUserId === profile?.id) return;
+
+    const connection = createPeerConnection(targetUserId);
+    const peerConn = { userId: targetUserId, connection };
+    setPeerConnections(prev => new Map(prev).set(targetUserId, peerConn));
+
+    // Add local stream
+    if (localStream) {
+      localStream.getTracks().forEach(track => {
+        connection.addTrack(track, localStream);
+      });
+    }
+
+    const offer = await connection.createOffer();
+    await connection.setLocalDescription(offer);
+
+    if (channel) {
+      channel.send({
+        type: 'broadcast',
+        event: 'webrtc-offer',
+        payload: {
+          offer,
+          targetUserId,
+          fromUserId: profile?.id
+        }
+      });
+    }
+  }, [createPeerConnection, localStream, channel, profile?.id]);
 
   // Setup Realtime channel for communication
   useEffect(() => {
@@ -86,7 +246,17 @@ const VideoConference = () => {
       .on('presence', { event: 'sync' }, () => {
         const state = roomChannel.presenceState();
         const users = Object.keys(state);
-        setConnectedUsers(users);
+        const newConnectedUsers = new Set(users);
+        
+        // Initiate calls to newly joined users
+        newConnectedUsers.forEach(userId => {
+          if (userId !== profile.id && !connectedUsers.has(userId)) {
+            console.log('New user joined, initiating call:', userId);
+            initiateCall(userId);
+          }
+        });
+
+        setConnectedUsers(newConnectedUsers);
         console.log('Connected users:', users);
       })
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
@@ -94,15 +264,43 @@ const VideoConference = () => {
       })
       .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
         console.log('User left:', key, leftPresences);
+        // Clean up peer connection
+        const peerConn = peerConnections.get(key);
+        if (peerConn) {
+          peerConn.connection.close();
+          setPeerConnections(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(key);
+            return newMap;
+          });
+        }
+        remoteVideoRefs.current.delete(key);
       })
-      // Handle media state changes only (chat messages are handled via database realtime)
-      // Handle video/audio state changes
+      // Handle WebRTC signaling
+      .on('broadcast', { event: 'webrtc-offer' }, ({ payload }) => {
+        if (payload.targetUserId === profile.id) {
+          handleSignaling(payload);
+        }
+      })
+      .on('broadcast', { event: 'webrtc-answer' }, ({ payload }) => {
+        if (payload.targetUserId === profile.id) {
+          handleSignaling(payload);
+        }
+      })
+      .on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
+        if (payload.targetUserId === profile.id) {
+          handleSignaling(payload);
+        }
+      })
+      // Handle media state changes
       .on('broadcast', { event: 'media_state' }, (payload) => {
         const { userId, videoEnabled, audioEnabled, screenSharing } = payload.payload;
         if (userId !== profile.id) {
-          setRemoteVideoEnabled(videoEnabled);
-          setRemoteAudioEnabled(audioEnabled);
-          setRemoteScreenSharing(screenSharing);
+          setRemoteStreams(prev => new Map(prev).set(userId, {
+            video: videoEnabled,
+            audio: audioEnabled,
+            screen: screenSharing
+          }));
         }
       })
       .subscribe(async (status) => {
@@ -122,7 +320,29 @@ const VideoConference = () => {
     return () => {
       roomChannel.unsubscribe();
     };
-  }, [roomId, profile?.id, profile?.full_name, profile?.email]);
+  }, [roomId, profile?.id, profile?.full_name, profile?.email, initiateCall, handleSignaling, connectedUsers, peerConnections]);
+
+  // Initialize local stream
+  useEffect(() => {
+    initializeLocalStream();
+  }, [initializeLocalStream]);
+
+  // Load device lists
+  useEffect(() => {
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+      const mics = devices.filter(device => device.kind === 'audioinput');
+      setAudioDevices(mics);
+      if (!selectedAudioDeviceId && mics.length > 0) {
+        setSelectedAudioDeviceId(mics[0].deviceId);
+      }
+
+      const outputs = devices.filter(device => device.kind === 'audiooutput');
+      setAudioOutputDevices(outputs);
+      if (!selectedAudioOutputDeviceId && outputs.length > 0) {
+        setSelectedAudioOutputDeviceId(outputs[0].deviceId);
+      }
+    });
+  }, [selectedAudioDeviceId, selectedAudioOutputDeviceId]);
 
   // Load existing chat messages and setup realtime subscription
   useEffect(() => {
@@ -187,63 +407,16 @@ const VideoConference = () => {
     };
   }, [roomId]);
 
-  useEffect(() => {
-    // Simular inicialização da câmera
-    if (videoRef.current && isVideoOn) {
-      navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-        .then(stream => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
-        })
-        .catch(err => console.log('Erro ao acessar câmera:', err));
-    }
-  }, [isVideoOn]);
-
-  useEffect(() => {
-    navigator.mediaDevices.enumerateDevices().then(devices => {
-      const mics = devices.filter(device => device.kind === 'audioinput');
-      setAudioDevices(mics);
-      if (!selectedAudioDeviceId && mics.length > 0) {
-        setSelectedAudioDeviceId(mics[0].deviceId);
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    if (isVideoOn && selectedAudioDeviceId) {
-      navigator.mediaDevices.getUserMedia({ video: true, audio: { deviceId: selectedAudioDeviceId } })
-        .then(stream => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
-        })
-        .catch(err => console.log('Erro ao acessar câmera/microfone:', err));
-    }
-  }, [selectedAudioDeviceId, isVideoOn]);
-
-  useEffect(() => {
-    navigator.mediaDevices.enumerateDevices().then(devices => {
-      const outputs = devices.filter(device => device.kind === 'audiooutput');
-      setAudioOutputDevices(outputs);
-      if (!selectedAudioOutputDeviceId && outputs.length > 0) {
-        setSelectedAudioOutputDeviceId(outputs[0].deviceId);
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    if (videoRef.current && selectedAudioOutputDeviceId && typeof videoRef.current.setSinkId === 'function') {
-      videoRef.current.setSinkId(selectedAudioOutputDeviceId).catch((err: any) => {
-        console.warn('Erro ao definir saída de áudio:', err);
-      });
-    }
-  }, [selectedAudioOutputDeviceId]);
-
-  const toggleVideo = () => {
+  const toggleVideo = useCallback(() => {
     const newVideoState = !isVideoOn;
     setIsVideoOn(newVideoState);
-    console.log('Video toggled:', newVideoState);
+    
+    if (localStream) {
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = newVideoState;
+      }
+    }
     
     // Broadcast video state change
     if (channel && profile?.id) {
@@ -258,12 +431,18 @@ const VideoConference = () => {
         }
       });
     }
-  };
+  }, [isVideoOn, localStream, channel, profile?.id, isAudioOn, isScreenSharing]);
 
-  const toggleAudio = () => {
+  const toggleAudio = useCallback(() => {
     const newAudioState = !isAudioOn;
     setIsAudioOn(newAudioState);
-    console.log('Audio toggled:', newAudioState);
+    
+    if (localStream) {
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = newAudioState;
+      }
+    }
     
     // Broadcast audio state change
     if (channel && profile?.id) {
@@ -278,36 +457,31 @@ const VideoConference = () => {
         }
       });
     }
-  };
+  }, [isAudioOn, localStream, channel, profile?.id, isVideoOn, isScreenSharing]);
 
-  const toggleScreenShare = async () => {
-    console.log('toggleScreenShare chamado');
+  const toggleScreenShare = useCallback(async () => {
     if (!isScreenSharing) {
       try {
-        console.log('Solicitando getDisplayMedia...');
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        console.log('getDisplayMedia retornou stream:', stream);
-        if (screenVideoRef.current) {
-          screenVideoRef.current.srcObject = stream;
-          screenVideoRef.current.play?.();
-          console.log('Stream atribuído ao screenVideoRef:', screenVideoRef.current, stream);
-          setTimeout(() => {
-            console.log('Dentro do setTimeout, screenVideoRef.current:', screenVideoRef.current);
-            if (screenVideoRef.current) {
-              console.log('screenVideoRef.current.paused:', screenVideoRef.current.paused);
-              console.log('screenVideoRef.current.srcObject:', screenVideoRef.current.srcObject);
-              if (screenVideoRef.current.paused) {
-                screenVideoRef.current.play().then(() => {
-                  console.log('Forçou play no vídeo de compartilhamento!');
-                }).catch(err => {
-                  console.warn('Erro ao forçar play:', err);
-                });
-              }
-            } else {
-              console.warn('screenVideoRef.current está null dentro do setTimeout!');
-            }
-          }, 1000);
+        const stream = await navigator.mediaDevices.getDisplayMedia({ 
+          video: true, 
+          audio: true 
+        });
+        
+        setScreenStream(stream);
+        if (screenShareRef.current) {
+          screenShareRef.current.srcObject = stream;
         }
+        
+        // Replace video track in all peer connections
+        peerConnections.forEach((peerConn) => {
+          const videoSender = peerConn.connection.getSenders().find(
+            sender => sender.track?.kind === 'video'
+          );
+          if (videoSender) {
+            videoSender.replaceTrack(stream.getVideoTracks()[0]);
+          }
+        });
+        
         setIsScreenSharing(true);
         
         // Broadcast screen sharing state
@@ -326,8 +500,21 @@ const VideoConference = () => {
         
         stream.getVideoTracks()[0].addEventListener('ended', () => {
           setIsScreenSharing(false);
-          if (screenVideoRef.current) {
-            screenVideoRef.current.srcObject = null;
+          setScreenStream(null);
+          if (screenShareRef.current) {
+            screenShareRef.current.srcObject = null;
+          }
+          
+          // Restore camera video track
+          if (localStream) {
+            peerConnections.forEach((peerConn) => {
+              const videoSender = peerConn.connection.getSenders().find(
+                sender => sender.track?.kind === 'video'
+              );
+              if (videoSender) {
+                videoSender.replaceTrack(localStream.getVideoTracks()[0]);
+              }
+            });
           }
           
           // Broadcast screen sharing stopped
@@ -348,9 +535,22 @@ const VideoConference = () => {
         console.log('Erro ao compartilhar tela:', err);
       }
     } else {
+      if (screenStream) {
+        screenStream.getTracks().forEach(track => track.stop());
+        setScreenStream(null);
+      }
       setIsScreenSharing(false);
-      if (screenVideoRef.current) {
-        screenVideoRef.current.srcObject = null;
+      
+      // Restore camera video track
+      if (localStream) {
+        peerConnections.forEach((peerConn) => {
+          const videoSender = peerConn.connection.getSenders().find(
+            sender => sender.track?.kind === 'video'
+          );
+          if (videoSender) {
+            videoSender.replaceTrack(localStream.getVideoTracks()[0]);
+          }
+        });
       }
       
       // Broadcast screen sharing stopped
@@ -367,92 +567,7 @@ const VideoConference = () => {
         });
       }
     }
-  };
-
-  const drawToCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'red';
-    ctx.fillRect(0, 0, canvas.width, canvas.height); // DEBUG: canvas deve ficar vermelho
-    console.log('drawToCanvas chamado');
-    if (videoRef.current && videoRef.current.srcObject) {
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width / 2, canvas.height / 2);
-      console.log('Desenhando vídeo local no canvas');
-    }
-    if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
-      ctx.drawImage(remoteVideoRef.current, canvas.width / 2, 0, canvas.width / 2, canvas.height / 2);
-      console.log('Desenhando vídeo remoto no canvas');
-    }
-    if (
-      screenVideoRef.current &&
-      screenVideoRef.current.srcObject &&
-      !screenVideoRef.current.paused &&
-      !screenVideoRef.current.ended
-    ) {
-      ctx.drawImage(screenVideoRef.current, 0, canvas.height / 2, canvas.width, canvas.height / 2);
-      console.log('Desenhando compartilhamento de tela no canvas');
-    }
-    requestAnimationFrame(drawToCanvas);
-  };
-
-  const toggleRecording = async () => {
-    if (!isRecording) {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      canvas.width = 1280;
-      canvas.height = 720;
-      drawToCanvas();
-      const canvasStream = canvas.captureStream(30);
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const destination = audioContext.createMediaStreamDestination();
-      let localStream = videoRef.current?.srcObject as MediaStream;
-      if (localStream) {
-        try {
-          const localAudioSource = audioContext.createMediaStreamSource(localStream);
-          localAudioSource.connect(destination);
-        } catch {}
-      }
-      let remoteStream = remoteVideoRef.current?.srcObject as MediaStream;
-      if (remoteStream) {
-        try {
-          const remoteAudioSource = audioContext.createMediaStreamSource(remoteStream);
-          remoteAudioSource.connect(destination);
-        } catch {}
-      }
-      let screenStream = screenVideoRef.current?.srcObject as MediaStream;
-      if (screenStream) {
-        try {
-          const screenAudioSource = audioContext.createMediaStreamSource(screenStream);
-          screenAudioSource.connect(destination);
-        } catch {}
-      }
-      const combinedStream = new MediaStream([
-        ...canvasStream.getVideoTracks(),
-        ...destination.stream.getAudioTracks()
-      ]);
-      const recorder = new MediaRecorder(combinedStream);
-      setRecordedChunks([]);
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          setRecordedChunks((prev) => [...prev, event.data]);
-        }
-      };
-      recorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-      };
-      recorder.start();
-      setMediaRecorder(recorder);
-      setIsRecording(true);
-    } else if (isRecording && mediaRecorder) {
-      mediaRecorder.stop();
-      setIsRecording(false);
-    }
-  };
+  }, [isScreenSharing, screenStream, localStream, peerConnections, channel, profile?.id, isVideoOn, isAudioOn]);
 
   const sendMessage = async () => {
     if (chatMessage.trim() && profile && roomId) {
@@ -487,24 +602,32 @@ const VideoConference = () => {
 
   const confirmEndCall = async () => {
     setEnding(true);
-    // Encerra todos os streams de vídeo/áudio
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-      tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
+    
+    // Stop all streams
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
     }
-    if (screenVideoRef.current && screenVideoRef.current.srcObject) {
-      const tracks = (screenVideoRef.current.srcObject as MediaStream).getTracks();
-      tracks.forEach(track => track.stop());
-      screenVideoRef.current.srcObject = null;
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => track.stop());
     }
-    // Atualiza status da sala para indisponível
+    
+    // Close all peer connections
+    peerConnections.forEach((peerConn) => {
+      peerConn.connection.close();
+    });
+    
+    // Update room status
     if (roomId) {
-      await supabase.from('meeting_rooms').update({ is_active: false, ended_at: new Date().toISOString() }).eq('id', roomId);
+      await supabase.from('meeting_rooms').update({ 
+        is_active: false, 
+        ended_at: new Date().toISOString() 
+      }).eq('id', roomId);
     }
+    
     setShowConfirm(false);
     setEnding(false);
-    // Redireciona conforme o tipo de usuário
+    
+    // Redirect based on user role
     if (profile?.role === 'admin') {
       navigate('/admin', { replace: true });
     } else {
@@ -516,20 +639,18 @@ const VideoConference = () => {
     setShowConfirm(false);
   };
 
-  // Função para entrar em tela cheia
-  const handleFullscreen = (ref: React.RefObject<HTMLVideoElement>) => {
-    if (ref.current) {
-      if (ref.current.requestFullscreen) {
-        ref.current.requestFullscreen();
-      } else if ((ref.current as any).webkitRequestFullscreen) {
-        (ref.current as any).webkitRequestFullscreen();
-      } else if ((ref.current as any).msRequestFullscreen) {
-        (ref.current as any).msRequestFullscreen();
+  // Helper function to create video element refs for remote users
+  const createRemoteVideoRef = useCallback((userId: string) => {
+    return (el: HTMLVideoElement | null) => {
+      if (el) {
+        remoteVideoRefs.current.set(userId, el);
+      } else {
+        remoteVideoRefs.current.delete(userId);
       }
-    }
-  };
+    };
+  }, []);
 
-  // Se a sala não existe ou não está ativa, exibe mensagem
+  // Loading and error states
   if (isLoadingRoom) {
     return <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">Carregando sala...</div>;
   }
@@ -550,7 +671,7 @@ const VideoConference = () => {
   const now = new Date();
   const fiveMinutesBefore = scheduledTime ? new Date(scheduledTime.getTime() - 5 * 60 * 1000) : null;
 
-  // Se a sala tem horário agendado e ainda não chegou a 5 minutos antes
+  // Time-based access control
   if (scheduledTime && fiveMinutesBefore && now < fiveMinutesBefore) {
     const formattedTime = new Date(scheduledTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const formattedDate = new Date(scheduledTime).toLocaleDateString('pt-BR');
@@ -558,19 +679,6 @@ const VideoConference = () => {
       <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white flex-col p-4 text-center">
         <h1 className="text-3xl font-bold mb-4">Aguarde o Horário da Reunião</h1>
         <p className="text-lg mb-8">A sala estará disponível a partir das {formattedTime} em {formattedDate}.</p>
-        <Button onClick={() => profile?.role === 'admin' ? navigate('/admin') : navigate('/')} className="bg-blue-600 hover:bg-blue-700 text-white">
-          Voltar
-        </Button>
-      </div>
-    );
-  }
-
-  // Se a reunião já passou do horário agendado e ainda não foi encerrada manualmente, mas já deveria estar encerrada
-  if (scheduledTime && now > scheduledTime && !room.ended_at && !room.is_active) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white flex-col p-4 text-center">
-        <h1 className="text-3xl font-bold mb-4">Sala Expirada</h1>
-        <p className="text-lg mb-8">O horário da reunião já passou e a sala não está mais ativa.</p>
         <Button onClick={() => profile?.role === 'admin' ? navigate('/admin') : navigate('/')} className="bg-blue-600 hover:bg-blue-700 text-white">
           Voltar
         </Button>
@@ -597,238 +705,110 @@ const VideoConference = () => {
           </div>
         </div>
       )}
-      {/* Elementos ocultos para gravação composta */}
-      <video ref={remoteVideoRef} style={{ display: 'none' }} />
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
+
       {/* Header */}
       <header className="bg-gray-800 border-b border-gray-700 p-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <div className="text-white">
-              <h1 className="text-lg font-semibold">Consulta - {meetingInfo.type}</h1>
+              <h1 className="text-lg font-semibold">Consulta - {room.type}</h1>
               <p className="text-sm text-gray-300">
-                {meetingInfo.client} com {meetingInfo.specialist}
+                Sala: {room.name} | Participantes: {connectedUsers.size}
               </p>
             </div>
           </div>
           
           <div className="flex items-center space-x-4">
-            {isRecording && (
-              <div className="flex items-center text-red-400">
-                <div className="w-3 h-3 bg-red-500 rounded-full mr-2 animate-pulse"></div>
-                Gravando
-              </div>
-            )}
             <div className="text-white text-sm">
               <Clock className="inline mr-1 h-4 w-4" />
-              Iniciado às {meetingInfo.startTime}
+              {scheduledTime ? 
+                `Agendado para ${scheduledTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` :
+                'Reunião em andamento'
+              }
             </div>
           </div>
         </div>
       </header>
 
       <div className="flex-1 flex gap-4 p-4">
-        {/* Câmeras à esquerda (quando compartilhando tela) */}
+        {/* Screen sharing area when active */}
         {isScreenSharing && (
-          <div className="flex flex-col gap-4 justify-start">
-            {/* Local Video */}
-            <div className="relative bg-gray-800 rounded-xl overflow-hidden w-48 h-36">
-              {isVideoOn ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-700">
-                  <div className="text-center text-white">
-                    <User className="mx-auto h-12 w-12 mb-2" />
-                    <p>Você (Câmera desligada)</p>
-                  </div>
-                </div>
-              )}
-              <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs">Você</div>
-              {/* Botão tela cheia para câmera local */}
-              <button
-                className="absolute top-2 right-2 bg-black/60 text-white rounded p-1 hover:bg-black/80 z-10"
-                onClick={() => handleFullscreen(videoRef)}
-                title="Tela cheia"
-                type="button"
-              >
-                ⛶
-              </button>
-            </div>
-            {/* Remote Video */}
-            <div className="relative bg-gray-800 rounded-xl overflow-hidden w-48 h-36">
-              {connectedUsers.length > 1 && remoteVideoEnabled ? (
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-700">
-                  <div className="text-center text-white">
-                    <User className="mx-auto h-12 w-12 mb-2" />
-                    <p>{meetingInfo.specialist}</p>
-                    <p className="text-xs text-gray-300">
-                      {connectedUsers.length > 1 ? 'Câmera desligada' : 'Conectando...'}
-                    </p>
-                  </div>
-                </div>
-              )}
-              {/* Status indicators */}
-              <div className="absolute top-2 left-2 flex gap-1">
-                {connectedUsers.length > 1 && (
-                  <>
-                    <div className={`w-2 h-2 rounded-full ${remoteVideoEnabled ? 'bg-green-500' : 'bg-red-500'}`} title={remoteVideoEnabled ? 'Vídeo ligado' : 'Vídeo desligado'} />
-                    <div className={`w-2 h-2 rounded-full ${remoteAudioEnabled ? 'bg-green-500' : 'bg-red-500'}`} title={remoteAudioEnabled ? 'Áudio ligado' : 'Áudio desligado'} />
-                    {remoteScreenSharing && <div className="w-2 h-2 rounded-full bg-blue-500" title="Compartilhando tela" />}
-                  </>
-                )}
+          <div className="flex-1 flex items-center justify-center">
+            <div className="relative rounded-2xl overflow-hidden bg-gray-900 shadow-lg w-full max-w-4xl aspect-video">
+              <video
+                ref={screenShareRef}
+                autoPlay
+                muted
+                className="w-full h-full object-contain"
+              />
+              <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded text-sm">
+                Compartilhamento de tela
               </div>
-              <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
-                {meetingInfo.specialist} {connectedUsers.length > 1 ? '(Online)' : '(Offline)'}
-              </div>
-              {/* Botão tela cheia para câmera remota */}
-              <button
-                className="absolute top-2 right-2 bg-black/60 text-white rounded p-1 hover:bg-black/80 z-10"
-                onClick={() => handleFullscreen(remoteVideoRef)}
-                title="Tela cheia"
-                type="button"
-              >
-                ⛶
-              </button>
             </div>
           </div>
         )}
 
-        {/* Compartilhamento de tela centralizado */}
-        <div
-          className={
-            isScreenSharing
-              ? "flex-1 flex items-center justify-center"
-              : "fixed bottom-6 left-6 z-50"
-          }
-        >
-          <div
-            className={
-              isScreenSharing
-                ? "relative rounded-2xl overflow-hidden bg-gray-900 shadow-lg w-full max-w-3xl aspect-video flex items-center justify-center border-4 border-white/10"
-                : "relative rounded-lg overflow-hidden shadow-lg bg-black/80 w-24 h-16 opacity-50 pointer-events-none"
-            }
-          >
-            <video
-              ref={screenVideoRef}
-              autoPlay
-              muted={!isScreenSharing}
-              className="w-full h-full object-contain"
-              style={{ background: '#222' }}
-            />
-            {/* Botão tela cheia para compartilhamento */}
-            <button
-              className="absolute top-2 right-2 bg-black/60 text-white rounded p-1 hover:bg-black/80 z-10"
-              onClick={() => handleFullscreen(screenVideoRef)}
-              title="Tela cheia"
-              type="button"
-            >
-              ⛶
-            </button>
+        {/* Video grid */}
+        <div className={`${isScreenSharing ? 'w-80 flex flex-col gap-4' : 'flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4'}`}>
+          {/* Local Video */}
+          <div className={`relative bg-gray-800 rounded-lg overflow-hidden ${isScreenSharing ? 'aspect-video' : ''}`}>
+            {isVideoOn ? (
+              <video
+                ref={localVideoRef}
+                autoPlay
+                muted
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gray-700">
+                <div className="text-center text-white">
+                  <User className="mx-auto h-16 w-16 mb-2" />
+                  <p>Você (Câmera desligada)</p>
+                </div>
+              </div>
+            )}
+            <div className="absolute bottom-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-sm">
+              Você
+              <div className="flex gap-1 mt-1">
+                <div className={`w-2 h-2 rounded-full ${isVideoOn ? 'bg-green-500' : 'bg-red-500'}`} />
+                <div className={`w-2 h-2 rounded-full ${isAudioOn ? 'bg-green-500' : 'bg-red-500'}`} />
+                {isScreenSharing && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+              </div>
+            </div>
           </div>
+
+          {/* Remote Videos */}
+          {Array.from(connectedUsers).filter(userId => userId !== profile?.id).map(userId => {
+            const userStreamState = remoteStreams.get(userId) || { video: false, audio: false, screen: false };
+            return (
+              <div key={userId} className={`relative bg-gray-800 rounded-lg overflow-hidden ${isScreenSharing ? 'aspect-video' : ''}`}>
+                {userStreamState.video ? (
+                  <video
+                    ref={createRemoteVideoRef(userId)}
+                    autoPlay
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-700">
+                    <div className="text-center text-white">
+                      <User className="mx-auto h-16 w-16 mb-2" />
+                      <p>Participante</p>
+                      <p className="text-sm text-gray-300">Câmera desligada</p>
+                    </div>
+                  </div>
+                )}
+                <div className="absolute bottom-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-sm">
+                  Participante
+                  <div className="flex gap-1 mt-1">
+                    <div className={`w-2 h-2 rounded-full ${userStreamState.video ? 'bg-green-500' : 'bg-red-500'}`} />
+                    <div className={`w-2 h-2 rounded-full ${userStreamState.audio ? 'bg-green-500' : 'bg-red-500'}`} />
+                    {userStreamState.screen && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
-
-        {/* Layout padrão (sem compartilhamento): grid de vídeos */}
-        {!isScreenSharing && (
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Local Video */}
-            <div className="relative bg-gray-800 rounded-lg overflow-hidden">
-              {isVideoOn ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-700">
-                  <div className="text-center text-white">
-                    <User className="mx-auto h-16 w-16 mb-2" />
-                    <p>Você (Câmera desligada)</p>
-                  </div>
-                </div>
-              )}
-              {/* Botão tela cheia para câmera local */}
-              <button
-                className="absolute top-2 right-2 bg-black/60 text-white rounded p-1 hover:bg-black/80 z-10"
-                onClick={() => handleFullscreen(videoRef)}
-                title="Tela cheia"
-                type="button"
-              >
-                ⛶
-              </button>
-              <div className="absolute bottom-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-sm">Você</div>
-            </div>
-            {/* Remote Video */}
-            <div className="relative bg-gray-800 rounded-lg overflow-hidden">
-              {connectedUsers.length > 1 && remoteVideoEnabled ? (
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-700">
-                  <div className="text-center text-white">
-                    <User className="mx-auto h-16 w-16 mb-2" />
-                    <p>{meetingInfo.specialist}</p>
-                    <p className="text-sm text-gray-300">
-                      {connectedUsers.length > 1 ? 'Câmera desligada' : 'Conectando...'}
-                    </p>
-                    {/* Status indicators */}
-                    {connectedUsers.length > 1 && (
-                      <div className="flex justify-center space-x-2 mt-2">
-                        <div className={`flex items-center space-x-1 text-xs px-2 py-1 rounded ${
-                          remoteVideoEnabled ? 'bg-green-600' : 'bg-red-600'
-                        }`}>
-                          <Video className="w-3 h-3" />
-                          <span>{remoteVideoEnabled ? 'On' : 'Off'}</span>
-                        </div>
-                        <div className={`flex items-center space-x-1 text-xs px-2 py-1 rounded ${
-                          remoteAudioEnabled ? 'bg-green-600' : 'bg-red-600'
-                        }`}>
-                          <Mic className="w-3 h-3" />
-                          <span>{remoteAudioEnabled ? 'On' : 'Off'}</span>
-                        </div>
-                        {remoteScreenSharing && (
-                          <div className="flex items-center space-x-1 text-xs px-2 py-1 rounded bg-blue-600">
-                            <Monitor className="w-3 h-3" />
-                            <span>Sharing</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              {/* Botão tela cheia para câmera remota */}
-              <button
-                className="absolute top-2 right-2 bg-black/60 text-white rounded p-1 hover:bg-black/80 z-10"
-                onClick={() => handleFullscreen(remoteVideoRef)}
-                title="Tela cheia"
-                type="button"
-              >
-                ⛶
-              </button>
-              <div className="absolute bottom-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-sm">
-                {meetingInfo.specialist}
-                {connectedUsers.length > 1 && (
-                  <span className="ml-2 text-green-400">●</span>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Chat Sidebar */}
         <div className="w-80 bg-gray-800 border-l border-gray-700 flex flex-col">
@@ -868,6 +848,7 @@ const VideoConference = () => {
       {/* Controls */}
       <div className="bg-gray-800 p-4 border-t border-gray-700">
         <div className="flex justify-center space-x-4">
+          {/* Audio Control */}
           <div className="relative flex items-center">
             <Button
               onClick={toggleAudio}
@@ -897,21 +878,44 @@ const VideoConference = () => {
                   <DropdownMenuItem
                     key={device.deviceId}
                     onClick={() => setSelectedAudioDeviceId(device.deviceId)}
-                    className={selectedAudioDeviceId === device.deviceId ? 'font-bold text-blue-600' : ''}
+                    className={selectedAudioDeviceId === device.deviceId ? 'bg-blue-100' : ''}
                   >
-                    {device.label || `Microfone ${device.deviceId.slice(-4)}`}
+                    {device.label || `Microfone ${device.deviceId.slice(0, 8)}`}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          {/* Video Control */}
+          <Button
+            onClick={toggleVideo}
+            variant="ghost"
+            size="icon"
+            className={`bg-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center hover:bg-blue-100 transition ${isVideoOn ? 'text-blue-700' : 'text-red-600'}`}
+            title={isVideoOn ? 'Desligar câmera' : 'Ligar câmera'}
+          >
+            <Video className="icon-medium" />
+          </Button>
+
+          {/* Screen Share Control */}
+          <Button
+            onClick={toggleScreenShare}
+            variant="ghost"
+            size="icon"
+            className={`bg-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center hover:bg-blue-100 transition ${isScreenSharing ? 'text-blue-700' : 'text-gray-700'}`}
+            title={isScreenSharing ? 'Parar compartilhamento' : 'Compartilhar tela'}
+          >
+            <Monitor className="icon-medium" />
+          </Button>
+
+          {/* Audio Output Control */}
           <div className="relative flex items-center">
             <Button
               variant="ghost"
               size="icon"
-              className={`bg-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center hover:bg-blue-100 transition text-blue-700`}
-              title="Selecionar saída de áudio"
-              disabled={audioOutputDevices.length === 0}
+              className="bg-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center hover:bg-blue-100 transition text-gray-700"
+              title="Configurar alto-falante"
             >
               <Volume2 className="icon-medium" />
             </Button>
@@ -921,60 +925,35 @@ const VideoConference = () => {
                   variant="ghost"
                   size="icon"
                   className="absolute -right-2 -bottom-2 w-8 h-8 bg-white border border-gray-200 shadow rounded-full flex items-center justify-center p-0"
-                  title="Selecionar saída de áudio"
+                  title="Selecionar alto-falante"
                 >
                   <ChevronDown className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {audioOutputDevices.length === 0 && (
-                  <DropdownMenuItem disabled>Nenhum dispositivo de saída encontrado</DropdownMenuItem>
+                  <DropdownMenuItem disabled>Nenhum alto-falante encontrado</DropdownMenuItem>
                 )}
                 {audioOutputDevices.map(device => (
                   <DropdownMenuItem
                     key={device.deviceId}
                     onClick={() => setSelectedAudioOutputDeviceId(device.deviceId)}
-                    className={selectedAudioOutputDeviceId === device.deviceId ? 'font-bold text-blue-600' : ''}
+                    className={selectedAudioOutputDeviceId === device.deviceId ? 'bg-blue-100' : ''}
                   >
-                    {device.label || `Saída ${device.deviceId.slice(-4)}`}
+                    {device.label || `Alto-falante ${device.deviceId.slice(0, 8)}`}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <Button
-            onClick={toggleVideo}
-            variant="ghost"
-            size="icon"
-            className={`bg-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center hover:bg-blue-100 transition ${isVideoOn ? 'text-blue-700' : 'text-red-600'}`}
-            title={isVideoOn ? 'Desligar vídeo' : 'Ligar vídeo'}
-          >
-            <Video className="icon-medium" />
-          </Button>
-          <Button
-            onClick={() => { console.log('Botão compartilhar tela clicado'); toggleScreenShare(); }}
-            variant="ghost"
-            size="icon"
-            className={`bg-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center hover:bg-blue-100 transition ${isScreenSharing ? 'text-green-700' : 'text-blue-700'}`}
-            title={isScreenSharing ? 'Parar compartilhamento' : 'Compartilhar tela'}
-          >
-            <Monitor className="icon-medium" />
-          </Button>
-          <Button
-            onClick={toggleRecording}
-            variant="ghost"
-            size="icon"
-            className={`bg-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center hover:bg-blue-100 transition ${isRecording ? 'text-red-600' : 'text-blue-700'}`}
-            title={isRecording ? 'Parar gravação' : 'Iniciar gravação'}
-          >
-            <CircleDot className="icon-medium" />
-          </Button>
+
+          {/* End Call */}
           <Button
             onClick={endCall}
             variant="ghost"
             size="icon"
-            className="bg-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center hover:bg-red-100 text-red-600 transition"
-            title="Desligar chamada"
+            className="bg-red-600 hover:bg-red-700 shadow-lg rounded-full w-16 h-16 flex items-center justify-center transition text-white"
+            title="Encerrar chamada"
           >
             <PhoneOff className="icon-medium" />
           </Button>
