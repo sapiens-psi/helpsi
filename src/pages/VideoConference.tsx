@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { User, Clock, Video, Mic, PhoneOff, Monitor } from 'lucide-react';
+import { User, Calendar, Clock, MessageCircle, PhoneOff } from 'lucide-react';
 import './VideoConference.css';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
@@ -9,37 +9,34 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
+// Declaração do tipo para a API do Jitsi
+declare global {
+  interface Window {
+    JitsiMeetExternalAPI: any;
+  }
+}
+
 const VideoConference = () => {
-  const [isVideoOn, setIsVideoOn] = useState(true);
-  const [isAudioOn, setIsAudioOn] = useState(true);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
   const [chatMessages, setChatMessages] = useState<any[]>([]);
-
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const screenVideoRef = useRef<HTMLVideoElement>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [jitsiApi, setJitsiApi] = useState<any>(null);
+  const [jitsiLoaded, setJitsiLoaded] = useState(false);
+  const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
-
+  const jitsiContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { id: roomId } = useParams();
   const { data: profile } = useProfile();
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [ending, setEnding] = useState(false);
-  
-  const [channel, setChannel] = useState<RealtimeChannel | null>(null);
-  const [connectedUsers, setConnectedUsers] = useState<string[]>([]);
 
-  // STUN servers para conectividade
-  const rtcConfig = {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
-    ]
-  };
+  const [meetingInfo] = useState({
+    client: 'João Silva',
+    specialist: 'Dra. Maria Santos',
+    type: 'Pós-Compra',
+    duration: '15 minutos',
+    startTime: '14:00'
+  });
 
   // Buscar informações da sala
   const { data: room, isLoading: isLoadingRoom } = useQuery({
@@ -57,214 +54,127 @@ const VideoConference = () => {
     enabled: !!roomId,
   });
 
-  // Inicializar stream local
-  const initializeLocalStream = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
-      
-      setLocalStream(stream);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
+  // Carregar script do Jitsi Meet
+  useEffect(() => {
+    const loadJitsiScript = () => {
+      if (window.JitsiMeetExternalAPI) {
+        setJitsiLoaded(true);
+        return;
       }
-      
-      console.log('Local stream initialized');
-      return stream;
-    } catch (error) {
-      console.error('Error accessing media devices:', error);
-      return null;
-    }
+
+      const script = document.createElement('script');
+      script.src = 'https://meet.jit.si/external_api.js';
+      script.async = true;
+      script.onload = () => setJitsiLoaded(true);
+      script.onerror = () => console.error('Erro ao carregar Jitsi Meet');
+      document.head.appendChild(script);
+    };
+
+    loadJitsiScript();
   }, []);
 
-  // Criar conexão WebRTC
-  const createPeerConnection = useCallback(() => {
-    const pc = new RTCPeerConnection(rtcConfig);
-    
-    // Quando receber stream remoto
-    pc.ontrack = (event) => {
-      console.log('Received remote stream');
-      const [stream] = event.streams;
-      setRemoteStream(stream);
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
-      }
-    };
-    
-    // Quando candidato ICE for gerado
-    pc.onicecandidate = (event) => {
-      if (event.candidate && channel) {
-        console.log('Sending ICE candidate');
-        channel.send({
-          type: 'broadcast',
-          event: 'ice-candidate',
-          payload: {
-            candidate: event.candidate,
-            from: profile?.id
+  // Inicializar Jitsi Meet
+  useEffect(() => {
+    if (!jitsiLoaded || !roomId || !profile || !jitsiContainerRef.current || jitsiApi) {
+      return;
+    }
+
+    // Aguardar um pouco para garantir que o container esteja pronto
+    const initializeJitsi = () => {
+      try {
+        const domain = 'meet.jit.si';
+        const options = {
+          roomName: `helpsi-room-${roomId}`,
+          width: '100%',
+          height: '100%',
+          parentNode: jitsiContainerRef.current,
+          configOverwrite: {
+            startWithAudioMuted: false,
+            startWithVideoMuted: false,
+            enableWelcomePage: false,
+            enableClosePage: false,
+            prejoinPageEnabled: false,
+            disableDeepLinking: true,
+            doNotStoreRoom: true
+          },
+          interfaceConfigOverwrite: {
+            TOOLBAR_BUTTONS: [
+              'microphone',
+              'camera',
+              'desktop',
+              'fullscreen',
+              'hangup',
+              'chat',
+              'settings',
+              'tileview'
+            ],
+            SHOW_JITSI_WATERMARK: false,
+            SHOW_WATERMARK_FOR_GUESTS: false,
+            SHOW_BRAND_WATERMARK: false,
+            SHOW_POWERED_BY: false,
+            SHOW_PROMOTIONAL_CLOSE_PAGE: false,
+            SHOW_CHROME_EXTENSION_BANNER: false,
+            MOBILE_APP_PROMO: false
+          },
+          userInfo: {
+            displayName: profile.full_name || profile.email || 'Usuário',
+            email: profile.email
           }
+        };
+
+        const api = new window.JitsiMeetExternalAPI(domain, options);
+        setJitsiApi(api);
+
+        // Event listeners
+        api.addEventListener('readyToClose', () => {
+          endCall();
         });
+
+        api.addEventListener('participantLeft', (participant: any) => {
+          console.log('Participante saiu:', participant);
+        });
+
+        api.addEventListener('participantJoined', (participant: any) => {
+          console.log('Participante entrou:', participant);
+        });
+
+        api.addEventListener('videoConferenceJoined', () => {
+          console.log('Usuário entrou na conferência');
+        });
+
+        api.addEventListener('videoConferenceLeft', () => {
+          console.log('Usuário saiu da conferência');
+        });
+
+        return api;
+      } catch (error) {
+        console.error('Erro ao inicializar Jitsi:', error);
+        return null;
       }
     };
-    
-    // Monitorar estado da conexão
-    pc.onconnectionstatechange = () => {
-      console.log('Connection state:', pc.connectionState);
-    };
-    
-    return pc;
-  }, [channel, profile?.id]);
 
-  // Lidar com sinalização WebRTC
-  const handleSignaling = useCallback(async (payload: any) => {
-    if (!peerConnection) return;
-    
-    const { offer, answer, candidate, from } = payload;
-    
-    if (from === profile?.id) return; // Ignorar próprias mensagens
-    
-    try {
-      if (offer) {
-        console.log('Received offer');
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-        const answerDescription = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answerDescription);
-        
-        if (channel) {
-          channel.send({
-            type: 'broadcast',
-            event: 'answer',
-            payload: {
-              answer: answerDescription,
-              from: profile?.id
-            }
-          });
-        }
-      } else if (answer) {
-        console.log('Received answer');
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-      } else if (candidate) {
-        console.log('Received ICE candidate');
-        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    const timeoutId = setTimeout(() => {
+      const api = initializeJitsi();
+      if (!api) {
+        console.error('Falha ao inicializar Jitsi Meet');
       }
-    } catch (error) {
-      console.error('Error handling signaling:', error);
-    }
-  }, [peerConnection, channel, profile?.id]);
+    }, 500);
 
-  // Iniciar chamada com novo usuário
-  const initiateCall = useCallback(async () => {
-    if (!peerConnection || !localStream) return;
-    
-    // Adicionar stream local ao peer connection
-    localStream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, localStream);
-    });
-    
-    // Criar offer
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
-    
-    if (channel) {
-      console.log('Sending offer');
-      channel.send({
-        type: 'broadcast',
-        event: 'offer',
-        payload: {
-          offer,
-          from: profile?.id
+    return () => {
+      clearTimeout(timeoutId);
+      if (jitsiApi) {
+        try {
+          jitsiApi.dispose();
+        } catch (error) {
+          console.error('Erro ao limpar Jitsi API:', error);
         }
-      });
-    }
-  }, [peerConnection, localStream, channel, profile?.id]);
+      }
+    };
+  }, [jitsiLoaded, roomId, profile, jitsiApi]);
 
-  // Configurar canal de comunicação em tempo real
+  // Setup chat realtime
   useEffect(() => {
     if (!roomId || !profile?.id) return;
-
-    const roomChannel = supabase.channel(`room:${roomId}`, {
-      config: {
-        presence: {
-          key: profile.id,
-        },
-      },
-    });
-
-    roomChannel
-      .on('presence', { event: 'sync' }, () => {
-        const state = roomChannel.presenceState();
-        const users = Object.keys(state);
-        setConnectedUsers(users);
-        console.log('Connected users:', users);
-      })
-      .on('presence', { event: 'join' }, ({ key }) => {
-        console.log('User joined:', key);
-        // Se outro usuário entrou e sou o primeiro, inicio a chamada
-        if (connectedUsers.length === 0) {
-          setTimeout(() => initiateCall(), 1000);
-        }
-      })
-      .on('presence', { event: 'leave' }, ({ key }) => {
-        console.log('User left:', key);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = null;
-        }
-        setRemoteStream(null);
-      })
-      // Sinalização WebRTC
-      .on('broadcast', { event: 'offer' }, ({ payload }) => {
-        handleSignaling(payload);
-      })
-      .on('broadcast', { event: 'answer' }, ({ payload }) => {
-        handleSignaling(payload);
-      })
-      .on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
-        handleSignaling(payload);
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Connected to room channel');
-          await roomChannel.track({
-            user_id: profile.id,
-            user_name: profile.full_name || 'User',
-            online_at: new Date().toISOString(),
-          });
-        }
-      });
-
-    setChannel(roomChannel);
-
-    return () => {
-      roomChannel.unsubscribe();
-    };
-  }, [roomId, profile?.id, profile?.full_name, handleSignaling, connectedUsers.length, initiateCall]);
-
-  // Inicializar WebRTC e stream
-  useEffect(() => {
-    const init = async () => {
-      // Criar peer connection
-      const pc = createPeerConnection();
-      setPeerConnection(pc);
-      
-      // Inicializar stream local
-      await initializeLocalStream();
-    };
-    
-    init();
-    
-    return () => {
-      if (peerConnection) {
-        peerConnection.close();
-      }
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, [createPeerConnection, initializeLocalStream]);
-
-  // Load existing chat messages and setup realtime subscription
-  useEffect(() => {
-    if (!roomId) return;
 
     // Load existing messages
     const loadMessages = async () => {
@@ -323,95 +233,13 @@ const VideoConference = () => {
     return () => {
       messagesChannel.unsubscribe();
     };
-  }, [roomId]);
-
-  const toggleVideo = useCallback(() => {
-    setIsVideoOn(!isVideoOn);
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !isVideoOn;
-      }
-    }
-  }, [isVideoOn, localStream]);
-
-  const toggleAudio = useCallback(() => {
-    setIsAudioOn(!isAudioOn);
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !isAudioOn;
-      }
-    }
-  }, [isAudioOn, localStream]);
-
-  const toggleScreenShare = useCallback(async () => {
-    if (!isScreenSharing) {
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ 
-          video: true, 
-          audio: true 
-        });
-        
-        if (screenVideoRef.current) {
-          screenVideoRef.current.srcObject = stream;
-        }
-        
-        // Substituir track de vídeo na conexão peer
-        if (peerConnection) {
-          const sender = peerConnection.getSenders().find(s => 
-            s.track && s.track.kind === 'video'
-          );
-          if (sender) {
-            sender.replaceTrack(stream.getVideoTracks()[0]);
-          }
-        }
-        
-        setIsScreenSharing(true);
-        
-        stream.getVideoTracks()[0].addEventListener('ended', () => {
-          setIsScreenSharing(false);
-          if (screenVideoRef.current) {
-            screenVideoRef.current.srcObject = null;
-          }
-          
-          // Restaurar câmera
-          if (localStream && peerConnection) {
-            const sender = peerConnection.getSenders().find(s => 
-              s.track && s.track.kind === 'video'
-            );
-            if (sender) {
-              sender.replaceTrack(localStream.getVideoTracks()[0]);
-            }
-          }
-        });
-      } catch (err) {
-        console.log('Erro ao compartilhar tela:', err);
-      }
-    } else {
-      setIsScreenSharing(false);
-      if (screenVideoRef.current) {
-        screenVideoRef.current.srcObject = null;
-      }
-      
-      // Restaurar câmera
-      if (localStream && peerConnection) {
-        const sender = peerConnection.getSenders().find(s => 
-          s.track && s.track.kind === 'video'
-        );
-        if (sender) {
-          sender.replaceTrack(localStream.getVideoTracks()[0]);
-        }
-      }
-    }
-  }, [isScreenSharing, localStream, peerConnection]);
+  }, [roomId, profile?.id]);
 
   const sendMessage = async () => {
     if (chatMessage.trim() && profile && roomId) {
       const sender = profile.full_name || profile.email || 'Usuário';
       
       try {
-        // Save message to database
         const { error } = await supabase
           .from('chat_messages')
           .insert({
@@ -440,17 +268,18 @@ const VideoConference = () => {
   const confirmEndCall = async () => {
     setEnding(true);
     
-    // Parar streams
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
+    // Dispose Jitsi API
+    if (jitsiApi) {
+      jitsiApi.dispose();
+      setJitsiApi(null);
     }
     
-    // Fechar conexão peer
-    if (peerConnection) {
-      peerConnection.close();
+    // Unsubscribe from channel
+    if (channel) {
+      channel.unsubscribe();
     }
     
-    // Atualizar status da sala
+    // Update room status to inactive
     if (roomId) {
       await supabase.from('meeting_rooms').update({ 
         is_active: false, 
@@ -461,7 +290,7 @@ const VideoConference = () => {
     setShowConfirm(false);
     setEnding(false);
     
-    // Redirecionar baseado no papel do usuário
+    // Redirect based on user role
     if (profile?.role === 'admin') {
       navigate('/admin', { replace: true });
     } else {
@@ -473,8 +302,7 @@ const VideoConference = () => {
     setShowConfirm(false);
   };
 
-
-  // Loading and error states
+  // Loading states
   if (isLoadingRoom) {
     return <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">Carregando sala...</div>;
   }
@@ -495,7 +323,7 @@ const VideoConference = () => {
   const now = new Date();
   const fiveMinutesBefore = scheduledTime ? new Date(scheduledTime.getTime() - 5 * 60 * 1000) : null;
 
-  // Time-based access control
+  // Check if meeting is scheduled and not yet time
   if (scheduledTime && fiveMinutesBefore && now < fiveMinutesBefore) {
     const formattedTime = new Date(scheduledTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const formattedDate = new Date(scheduledTime).toLocaleDateString('pt-BR');
@@ -506,6 +334,30 @@ const VideoConference = () => {
         <Button onClick={() => profile?.role === 'admin' ? navigate('/admin') : navigate('/')} className="bg-blue-600 hover:bg-blue-700 text-white">
           Voltar
         </Button>
+      </div>
+    );
+  }
+
+  // Check if meeting has expired
+  if (scheduledTime && now > scheduledTime && !room.ended_at && !room.is_active) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white flex-col p-4 text-center">
+        <h1 className="text-3xl font-bold mb-4">Sala Expirada</h1>
+        <p className="text-lg mb-8">O horário da reunião já passou e a sala não está mais ativa.</p>
+        <Button onClick={() => profile?.role === 'admin' ? navigate('/admin') : navigate('/')} className="bg-blue-600 hover:bg-blue-700 text-white">
+          Voltar
+        </Button>
+      </div>
+    );
+  }
+
+  if (!jitsiLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p>Carregando Jitsi Meet...</p>
+        </div>
       </div>
     );
   }
@@ -535,9 +387,9 @@ const VideoConference = () => {
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <div className="text-white">
-              <h1 className="text-lg font-semibold">Consulta - {room.type}</h1>
+              <h1 className="text-lg font-semibold">Consulta - {meetingInfo.type}</h1>
               <p className="text-sm text-gray-300">
-                Sala: {room.name} | Participantes: {connectedUsers.length}
+                {meetingInfo.client} com {meetingInfo.specialist}
               </p>
             </div>
           </div>
@@ -545,90 +397,39 @@ const VideoConference = () => {
           <div className="flex items-center space-x-4">
             <div className="text-white text-sm">
               <Clock className="inline mr-1 h-4 w-4" />
-              {scheduledTime ? 
-                `Agendado para ${scheduledTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` :
-                'Reunião em andamento'
-              }
+              Iniciado às {meetingInfo.startTime}
             </div>
+            <Button
+              onClick={endCall}
+              variant="ghost"
+              size="sm"
+              className="bg-red-600 hover:bg-red-700 text-white"
+              title="Encerrar chamada"
+            >
+              <PhoneOff className="h-4 w-4 mr-2" />
+              Encerrar
+            </Button>
           </div>
         </div>
       </header>
 
       <div className="flex-1 flex gap-4 p-4">
-        {/* Área de compartilhamento de tela */}
-        {isScreenSharing && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="relative rounded-2xl overflow-hidden bg-gray-900 shadow-lg w-full max-w-4xl aspect-video">
-              <video
-                ref={screenVideoRef}
-                autoPlay
-                muted
-                className="w-full h-full object-contain"
-              />
-              <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded text-sm">
-                Compartilhamento de tela
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Grade de vídeos */}
-        <div className={`${isScreenSharing ? 'w-80 flex flex-col gap-4' : 'flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4'}`}>
-          {/* Vídeo local */}
-          <div className={`relative bg-gray-800 rounded-lg overflow-hidden ${isScreenSharing ? 'aspect-video' : 'min-h-[300px]'}`}>
-            {isVideoOn ? (
-              <video
-                ref={localVideoRef}
-                autoPlay
-                muted
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gray-700">
-                <div className="text-center text-white">
-                  <User className="mx-auto h-16 w-16 mb-2" />
-                  <p>Você (Câmera desligada)</p>
-                </div>
-              </div>
-            )}
-            <div className="absolute bottom-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-sm">
-              Você
-              <div className="flex gap-1 mt-1">
-                <div className={`w-2 h-2 rounded-full ${isVideoOn ? 'bg-green-500' : 'bg-red-500'}`} />
-                <div className={`w-2 h-2 rounded-full ${isAudioOn ? 'bg-green-500' : 'bg-red-500'}`} />
-              </div>
-            </div>
-          </div>
-
-          {/* Vídeo remoto */}
-          {connectedUsers.filter(userId => userId !== profile?.id).length > 0 && (
-            <div className={`relative bg-gray-800 rounded-lg overflow-hidden ${isScreenSharing ? 'aspect-video' : 'min-h-[300px]'}`}>
-              {remoteStream ? (
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-700">
-                  <div className="text-center text-white">
-                    <User className="mx-auto h-16 w-16 mb-2" />
-                    <p>Participante</p>
-                    <p className="text-sm text-gray-300">Conectando...</p>
-                  </div>
-                </div>
-              )}
-              <div className="absolute bottom-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-sm">
-                Participante
-              </div>
-            </div>
-          )}
+        {/* Jitsi Meet Container */}
+        <div className="flex-1">
+          <div 
+            ref={jitsiContainerRef} 
+            className="w-full h-full min-h-[600px] bg-black rounded-lg overflow-hidden"
+            style={{ height: 'calc(100vh - 200px)' }}
+          />
         </div>
 
         {/* Chat Sidebar */}
-        <div className="w-80 bg-gray-800 border-l border-gray-700 flex flex-col">
+        <div className="w-80 bg-gray-800 border-l border-gray-700 flex flex-col rounded-lg">
           <div className="p-4 border-b border-gray-700">
-            <h3 className="text-white font-semibold">Chat</h3>
+            <h3 className="text-white font-semibold flex items-center">
+              <MessageCircle className="h-5 w-5 mr-2" />
+              Chat
+            </h3>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -657,67 +458,6 @@ const VideoConference = () => {
               </Button>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Controles */}
-      <div className="bg-gray-800 p-4 border-t border-gray-700">
-        <div className="flex justify-center space-x-4">
-          {/* Controle de áudio */}
-          <Button
-            onClick={toggleAudio}
-            variant="ghost"
-            size="icon"
-            className={`shadow-lg rounded-full w-16 h-16 flex items-center justify-center transition ${
-              isAudioOn 
-                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                : 'bg-red-600 hover:bg-red-700 text-white'
-            }`}
-            title={isAudioOn ? 'Desligar microfone' : 'Ligar microfone'}
-          >
-            <Mic className="icon-medium" />
-          </Button>
-
-          {/* Controle de vídeo */}
-          <Button
-            onClick={toggleVideo}
-            variant="ghost"
-            size="icon"
-            className={`shadow-lg rounded-full w-16 h-16 flex items-center justify-center transition ${
-              isVideoOn 
-                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                : 'bg-red-600 hover:bg-red-700 text-white'
-            }`}
-            title={isVideoOn ? 'Desligar câmera' : 'Ligar câmera'}
-          >
-            <Video className="icon-medium" />
-          </Button>
-
-          {/* Compartilhamento de tela */}
-          <Button
-            onClick={toggleScreenShare}
-            variant="ghost"
-            size="icon"
-            className={`shadow-lg rounded-full w-16 h-16 flex items-center justify-center transition ${
-              isScreenSharing 
-                ? 'bg-green-600 hover:bg-green-700 text-white' 
-                : 'bg-gray-600 hover:bg-gray-700 text-white'
-            }`}
-            title={isScreenSharing ? 'Parar compartilhamento' : 'Compartilhar tela'}
-          >
-            <Monitor className="icon-medium" />
-          </Button>
-
-          {/* Encerrar chamada */}
-          <Button
-            onClick={endCall}
-            variant="ghost"
-            size="icon"
-            className="bg-red-600 hover:bg-red-700 shadow-lg rounded-full w-16 h-16 flex items-center justify-center transition text-white"
-            title="Encerrar chamada"
-          >
-            <PhoneOff className="icon-medium" />
-          </Button>
         </div>
       </div>
     </div>
