@@ -23,29 +23,19 @@ export const useSpecialistConsultations = () => {
           return [];
         }
 
-        // Buscar consultas de pré-compra
+        // Buscar consultas de pré-compra (specialist_id aponta para profiles.id, não specialists.id)
         const { data: preCompraData, error: preCompraError } = await supabase
           .from('consultations_pre_compra')
-          .select(`
-            *,
-            profiles!consultations_pre_compra_client_id_fkey (
-              full_name
-            )
-          `)
-          .eq('specialist_id', specialist.id)
+          .select('*')
+          .eq('specialist_id', user.id)
           .order('scheduled_date', { ascending: true })
           .order('scheduled_time', { ascending: true });
 
-        // Buscar consultas de pós-compra
+        // Buscar consultas de pós-compra (specialist_id aponta para profiles.id, não specialists.id)
         const { data: posCompraData, error: posCompraError } = await supabase
           .from('consultations_pos_compra')
-          .select(`
-            *,
-            profiles!consultations_pos_compra_client_id_fkey (
-              full_name
-            )
-          `)
-          .eq('specialist_id', specialist.id)
+          .select('*')
+          .eq('specialist_id', user.id)
           .order('scheduled_date', { ascending: true })
           .order('scheduled_time', { ascending: true });
 
@@ -58,13 +48,13 @@ export const useSpecialistConsultations = () => {
         const preCompraConsultations = (preCompraData || []).map(consultation => ({
           ...consultation,
           type: 'pre-compra',
-          client_name: consultation.profiles?.full_name || 'Nome não informado'
+          client_name: 'Cliente ID: ' + consultation.client_id
         }));
 
         const posCompraConsultations = (posCompraData || []).map(consultation => ({
           ...consultation,
           type: 'pos-compra',
-          client_name: consultation.profiles?.full_name || 'Nome não informado'
+          client_name: 'Cliente ID: ' + consultation.client_id
         }));
 
         // Combinar e ordenar por data/hora

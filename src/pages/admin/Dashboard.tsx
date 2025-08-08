@@ -76,7 +76,7 @@ const Dashboard = () => {
             {consultations.slice(0, 5).map((consultation) => (
               <div key={consultation.id} className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
-                  <p className="font-medium">{consultation.client?.full_name || 'Cliente'}</p>
+                  <p className="font-medium">Cliente ID: {consultation.client_id || 'Não informado'}</p>
                   <p className="text-sm text-gray-600">{consultation.type} - {consultation.scheduled_date}</p>
                 </div>
                 <span className={`px-2 py-1 rounded-full text-xs ${

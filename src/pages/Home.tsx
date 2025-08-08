@@ -22,14 +22,16 @@ const Home = () => {
           <p className="text-white/80 text-xl md:text-2xl mb-10 max-w-3xl mx-auto leading-relaxed">
             Receba orientação personalizada antes e depois da compra com profissionais qualificados e experientes.
           </p>
-          <Link to="/auth">
-            <PulsatingButton 
-              className="btn-gradient text-lg px-10 py-4 font-bold shadow-glow hover:scale-105 transition-transform"
-              pulseColor="hsl(var(--primary-glow))"
-            >
-              Comece agora gratuitamente
-            </PulsatingButton>
-          </Link>
+          <div className="flex justify-center">
+            <Link to="/auth">
+              <PulsatingButton 
+                className="btn-gradient text-lg px-10 py-4 font-bold shadow-glow hover:scale-105 transition-transform"
+                pulseColor="hsl(var(--primary-glow))"
+              >
+                Comece agora gratuitamente
+              </PulsatingButton>
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -168,14 +170,16 @@ const Home = () => {
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Cadastre-se agora e agende sua primeira consulta com nossos especialistas certificados.
           </p>
-          <Link to="/auth">
-            <PulsatingButton 
-              className="btn-gradient text-lg px-10 py-4 font-bold"
-              pulseColor="hsl(var(--primary-glow))"
-            >
-              Criar Conta Gratuita
-            </PulsatingButton>
-          </Link>
+          <div className="flex justify-center">
+            <Link to="/auth">
+              <PulsatingButton 
+                className="btn-gradient text-lg px-10 py-4 font-bold"
+                pulseColor="hsl(var(--primary-glow))"
+              >
+                Criar Conta Gratuita
+              </PulsatingButton>
+            </Link>
+          </div>
         </div>
       </section>
 

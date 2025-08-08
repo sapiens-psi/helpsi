@@ -160,7 +160,7 @@ const ClientArea = () => {
                               {consultation.type === 'pre-compra' ? 'Pré-venda' : 'Pós-venda'}
                             </h3>
                             <p className="text-sm text-gray-600">
-                              com {consultation.specialist?.profiles?.full_name || 'Especialista não informado'}
+                              com {consultation.specialist_id ? 'Especialista' : 'Especialista não informado'}
                             </p>
                           </div>
                           <Badge className="bg-green-100 text-green-800">
@@ -176,15 +176,15 @@ const ClientArea = () => {
                         </div>
 
                         <div className="flex space-x-2">
-                          {consultation.meeting_room && (
-                            <Link to={`/conference/${consultation.meeting_room.id}`}>
-                              <PulsatingButton className="bg-green-500 hover:bg-green-600 text-sm px-3 py-1">
-                                <Video className="mr-2 h-4 w-4" />
+                          {consultation.meeting_room_id && (
+                            <Link to={`/conference/${consultation.meeting_room_id}`}>
+                              <Button size="sm" className="bg-green-500 hover:bg-green-600">
+                                <Video className="h-4 w-4 mr-2" />
                                 Entrar na Sala
-                              </PulsatingButton>
+                              </Button>
                             </Link>
                           )}
-                          {!consultation.meeting_room && (
+                          {!consultation.meeting_room_id && (
                             <Badge variant="outline" className="text-orange-600 border-orange-300">
                               Sala em preparação
                             </Badge>

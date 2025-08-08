@@ -3,16 +3,43 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { VideoIcon, CalendarIcon, ClockIcon, UserIcon } from 'lucide-react';
+import { VideoIcon, CalendarIcon, ClockIcon, UserIcon, XIcon, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSpecialistConsultations } from '@/hooks/useSpecialistConsultations';
+import { useCancelConsultation } from '@/hooks/useCancelConsultation';
+import { useUpdateConsultation } from '@/hooks/useConsultations';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 const SpecialistAgenda = () => {
   const [dateFilter, setDateFilter] = useState('');
   const { data: consultations = [], isLoading } = useSpecialistConsultations();
+  const cancelConsultation = useCancelConsultation();
+  const updateConsultation = useUpdateConsultation();
   const navigate = useNavigate();
+
+  const handleCancelConsultation = async (consultationId: string, type: string) => {
+    try {
+      await cancelConsultation.mutateAsync({ consultationId, type });
+      toast.success('Consulta cancelada com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao cancelar consulta');
+    }
+  };
+
+  const handleRestoreConsultation = async (consultationId: string, type: string) => {
+    try {
+      await updateConsultation.mutateAsync({
+        id: consultationId,
+        type: type,
+        status: 'agendada'
+      });
+      toast.success('Consulta restaurada com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao restaurar consulta');
+    }
+  };
 
   const filteredConsultations = consultations.filter(consultation => {
     if (!dateFilter) return true;
@@ -97,7 +124,7 @@ const SpecialistAgenda = () => {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">
-                    {format(new Date(consultation.scheduled_date), 'dd/MM/yyyy', { locale: ptBR })}
+                    {format(new Date(consultation.scheduled_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}
                   </CardTitle>
                   <div className="flex gap-2">
                     <Badge className={getStatusColor(consultation.status)}>
@@ -130,19 +157,42 @@ const SpecialistAgenda = () => {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center justify-end">
-                    {consultation.meeting_room_id && (
+                  <div className="flex items-center justify-end gap-2">
+                    {consultation.meeting_room_id && consultation.status === 'agendada' && (
                       <Button
                         onClick={() => navigate(`/conference/${consultation.meeting_room_id}`)}
-                        disabled={consultation.status === 'cancelada'}
-                        className={
-                          consultation.status === 'cancelada'
-                            ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed'
-                            : ''
-                        }
+                        className="bg-blue-600 hover:bg-blue-700"
                       >
                         <VideoIcon className="mr-2 h-4 w-4" />
                         Acessar Sala
+                      </Button>
+                    )}
+                    {consultation.status === 'agendada' && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleCancelConsultation(consultation.id, consultation.type)}
+                        disabled={cancelConsultation.isPending}
+                      >
+                        <XIcon className="mr-2 h-4 w-4" />
+                        Cancelar
+                      </Button>
+                    )}
+                    {consultation.status === 'cancelada' && (
+                      <Button
+                        onClick={() => handleRestoreConsultation(consultation.id, consultation.type)}
+                        disabled={updateConsultation.isPending}
+                        variant="outline"
+                        size="sm"
+                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                      >
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        Restaurar Consulta
+                      </Button>
+                    )}
+                    {!consultation.meeting_room_id && consultation.status === 'agendada' && (
+                      <Button size="sm" disabled>
+                        Sala não disponível
                       </Button>
                     )}
                   </div>

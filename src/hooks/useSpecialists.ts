@@ -7,7 +7,7 @@ export function useSpecialists() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('specialists')
-        .select('*, profiles(full_name, phone, crp)')
+        .select('*, profiles!specialists_user_id_fkey(id, full_name, phone, crp)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;

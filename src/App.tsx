@@ -34,6 +34,7 @@ import AgendaPreVenda from "./pages/admin/AgendaPreVenda";
 import Clientes from "./pages/admin/Clientes";
 import DiscountCoupons from "./pages/admin/DiscountCoupons";
 import ValidationCoupons from "./pages/admin/ValidationCoupons";
+import PDFsExplicativos from "./pages/admin/PDFsExplicativos";
 
 // Specialist Pages
 import SpecialistAgenda from "./pages/specialist/SpecialistAgenda";
@@ -118,6 +119,7 @@ const App = () => (
               <Route path="clientes" element={<Clientes />} />
               <Route path="discount-coupons" element={<DiscountCoupons />} />
               <Route path="validation-coupons" element={<ValidationCoupons />} />
+              <Route path="pdfs-explicativos" element={<PDFsExplicativos />} />
             </Route>
             {/* Specialist Routes */}
             <Route 

@@ -1,40 +1,140 @@
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMeetingRooms, useCreateMeetingRoom } from '@/hooks/useMeetingRooms';
-import { VideoIcon, Plus, Clock, Users } from 'lucide-react';
+import { useUpdateConsultation } from '@/hooks/useConsultations';
+import { useClients } from '@/hooks/useClients';
+import { useSpecialists } from '@/hooks/useSpecialists';
+import { useCreateConsultation } from '@/hooks/useSchedule';
+import { VideoIcon, Plus, Clock, Users, RotateCcw, X, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 const SalasPosVenda = () => {
   const { data: meetingRooms = [], isLoading } = useMeetingRooms('pos-compra');
   const createMeetingRoom = useCreateMeetingRoom();
+  const updateConsultation = useUpdateConsultation();
+  const { data: clients, isLoading: loadingClients } = useClients();
+  const { data: specialists, isLoading: loadingSpecialists } = useSpecialists();
+  const { mutateAsync: createConsultation, isPending: isCreating } = useCreateConsultation();
   const [showForm, setShowForm] = useState(false);
-  const [manualRoom, setManualRoom] = useState({
-    name: '',
-    description: '',
-    scheduled_at: '',
-  });
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedSpecialistId, setSelectedSpecialistId] = useState('');
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
+  const [description, setDescription] = useState('');
+  const [validationCoupon, setValidationCoupon] = useState('');
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
 
-  const handleCreateManualRoom = async () => {
+  const handleRestoreConsultation = async (room: any) => {
     try {
-      const payload: any = {
-        ...manualRoom,
-        type: 'pos-compra',
-        created_manually: true,
-        room_token: 'manual-' + Date.now(),
-      };
-      if (!manualRoom.scheduled_at) {
-        delete payload.scheduled_at;
+      const consultationId = room.consultations_pos_compra_id;
+      if (consultationId) {
+        await updateConsultation.mutateAsync({
+          id: consultationId,
+          type: 'pos-compra',
+          status: 'agendada'
+        });
       }
-      await createMeetingRoom.mutateAsync(payload);
-      setShowForm(false);
-      setManualRoom({ name: '', description: '', scheduled_at: '' });
     } catch (error) {
-      console.error('Erro ao criar sala manual:', error);
+      console.error('Erro ao restaurar consulta:', error);
+    }
+  };
+
+  const handleCancelConsultation = async (room: any) => {
+    try {
+      const consultationId = room.consultations_pos_compra_id;
+      if (consultationId) {
+        await updateConsultation.mutateAsync({
+          id: consultationId,
+          type: 'pos-compra',
+          status: 'cancelada'
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao cancelar consulta:', error);
+    }
+  };
+
+  const { toast } = useToast();
+
+  const handleCreateManualConsultation = async () => {
+    // Validações
+    if (!selectedClientId) {
+      toast({
+        title: "Erro",
+        description: "Selecione um cliente",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!scheduledDate) {
+      toast({
+        title: "Erro",
+        description: "Selecione uma data",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!scheduledTime) {
+      toast({
+        title: "Erro",
+        description: "Selecione um horário",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!validationCoupon.trim()) {
+      toast({
+        title: "Erro",
+        description: "Cupom de validação é obrigatório para consultas pós-compra",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const finalDescription = `Cupom de validação: ${validationCoupon}${description ? '\n\nObservações: ' + description : ''}`;
+      
+      await createConsultation({
+        client_id: selectedClientId,
+        type: 'pos-compra',
+        scheduled_date: scheduledDate,
+        scheduled_time: scheduledTime,
+        description: finalDescription,
+        duration_minutes: 30,
+        specialist_id: selectedSpecialistId === 'none' ? null : selectedSpecialistId || null,
+        validation_coupon: validationCoupon
+      });
+
+      toast({
+        title: "Sucesso",
+        description: "Consulta pós-compra criada com sucesso!",
+      });
+      setShowForm(false);
+      setSelectedClientId('');
+      setSelectedSpecialistId('');
+      setScheduledDate('');
+      setScheduledTime('');
+      setDescription('');
+      setValidationCoupon('');
+    } catch (error: any) {
+      console.error('Erro ao criar consulta manual:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao criar consulta",
+        variant: "destructive",
+      });
     }
   };
 
@@ -56,31 +156,132 @@ const SalasPosVenda = () => {
           />
           <Button onClick={() => setShowForm(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            Criar Sala Manual
+            Criar Consulta Manual
           </Button>
         </div>
       </div>
 
       {showForm && (
-        <Card className="mb-4">
-          <CardContent className="py-6">
-            <div className="flex flex-col md:flex-row gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">Nome da Sala</label>
-                <input type="text" className="input" value={manualRoom.name} onChange={e => setManualRoom({ ...manualRoom, name: e.target.value })} />
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">Descrição</label>
-                <input type="text" className="input" value={manualRoom.description} onChange={e => setManualRoom({ ...manualRoom, description: e.target.value })} />
-              </div>
+        <Card className="mb-4 border-green-200">
+          <CardHeader>
+            <CardTitle className="text-green-600">Criar Nova Consulta Pós-Compra</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Data/Hora</label>
-                <input type="datetime-local" className="input" value={manualRoom.scheduled_at} onChange={e => setManualRoom({ ...manualRoom, scheduled_at: e.target.value })} />
+                <Label htmlFor="client">Cliente *</Label>
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingClients ? (
+                      <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                    ) : (
+                      clients?.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            {client.full_name} - {client.phone}
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
-              <Button onClick={handleCreateManualRoom} disabled={createMeetingRoom.isPending}>
-                Salvar
+
+              <div>
+                <Label htmlFor="specialist">Especialista (opcional)</Label>
+                <Select value={selectedSpecialistId} onValueChange={setSelectedSpecialistId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um especialista" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum especialista</SelectItem>
+                    {loadingSpecialists ? (
+                      <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                    ) : (
+                      specialists?.map((specialist) => (
+                        <SelectItem key={specialist.id} value={specialist.id}>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            {specialist.profiles?.full_name} - CRP: {specialist.profiles?.crp}
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="scheduledDate">Data *</Label>
+                <Input
+                  id="scheduledDate"
+                  type="date"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="scheduledTime">Horário *</Label>
+                <Input
+                  id="scheduledTime"
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(e) => setScheduledTime(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="validationCoupon">Cupom de Validação *</Label>
+              <Input
+                id="validationCoupon"
+                value={validationCoupon}
+                onChange={(e) => setValidationCoupon(e.target.value)}
+                placeholder="Digite o cupom de validação do material psicológico"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="description">Observações Adicionais</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Observações adicionais sobre a consulta (opcional)"
+                rows={3}
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleCreateManualConsultation}
+                className="bg-green-600 hover:bg-green-700"
+                disabled={isCreating}
+              >
+                {isCreating ? 'Criando...' : 'Criar Consulta'}
               </Button>
-              <Button variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowForm(false);
+                  setSelectedClientId('');
+                  setSelectedSpecialistId('');
+                  setScheduledDate('');
+                  setScheduledTime('');
+                  setDescription('');
+                  setValidationCoupon('');
+                }}
+              >
+                Cancelar
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -109,9 +310,21 @@ const SalasPosVenda = () => {
                       {room.scheduled_at ? new Date(room.scheduled_at).toLocaleString() : 'Sem data'}
                     </p>
                   </div>
-                  <Badge className={room.created_manually ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'}>
-                    {room.created_manually ? 'Manual' : 'Agendada'}
-                  </Badge>
+                  <div className="flex gap-2">
+                    <Badge className={
+                      room.status === 'agendada' ? 'bg-blue-100 text-blue-800' :
+                      room.status === 'cancelada' ? 'bg-red-100 text-red-800' :
+                      room.status === 'concluida' ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-800'
+                    }>
+                      {room.status || 'Agendada'}
+                    </Badge>
+                    {room.created_manually && (
+                      <Badge className="bg-yellow-100 text-yellow-800">
+                        Manual
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -128,12 +341,33 @@ const SalasPosVenda = () => {
                     <div className="space-x-2">
                       <Button 
                         onClick={() => navigate(`/conference/${room.id}`)}
-                        disabled={!room.is_active}
-                        className={!room.is_active ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed' : ''}
+                        disabled={!room.is_active || room.status === 'cancelada'}
+                        className={(!room.is_active || room.status === 'cancelada') ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed' : ''}
                       >
                         <VideoIcon className="mr-2 h-4 w-4" />
                         Acessar Sala
                       </Button>
+                      {room.status === 'cancelada' ? (
+                        <Button 
+                          onClick={() => handleRestoreConsultation(room)}
+                          disabled={updateConsultation.isPending}
+                          variant="outline"
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        >
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          Restaurar Consulta
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={() => handleCancelConsultation(room)}
+                          disabled={updateConsultation.isPending}
+                          variant="outline"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          Cancelar Consulta
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

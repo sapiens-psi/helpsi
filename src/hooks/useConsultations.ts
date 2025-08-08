@@ -9,18 +9,7 @@ export function useConsultations() {
       // Buscar consultas de pré-compra
       const { data: preCompraData, error: preCompraError } = await supabase
         .from('consultations_pre_compra')
-        .select(`
-          *, 
-          client:profiles(full_name, phone), 
-          specialist:specialists(*),
-          meeting_room:meeting_rooms(
-            id,
-            room_token,
-            name,
-            is_active,
-            scheduled_at
-          )
-        `)
+        .select('*')
         .order('scheduled_date', { ascending: false });
       
       if (preCompraError) throw preCompraError;
@@ -28,18 +17,7 @@ export function useConsultations() {
       // Buscar consultas de pós-compra
       const { data: posCompraData, error: posCompraError } = await supabase
         .from('consultations_pos_compra')
-        .select(`
-          *, 
-          client:profiles(full_name, phone), 
-          specialist:specialists(*),
-          meeting_room:meeting_rooms(
-            id,
-            room_token,
-            name,
-            is_active,
-            scheduled_at
-          )
-        `)
+        .select('*')
         .order('scheduled_date', { ascending: false });
       
       if (posCompraError) throw posCompraError;
@@ -89,6 +67,8 @@ export const useCreateConsultation = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultations'] });
+      queryClient.invalidateQueries({ queryKey: ['specialist-consultations'] });
+      queryClient.invalidateQueries({ queryKey: ['meeting-rooms'] });
     }
   });
 };
@@ -101,18 +81,27 @@ export const useUpdateConsultation = () => {
       // Determinar a tabela correta baseada no tipo
       const tableName = type === 'pre-compra' ? 'consultations_pre_compra' : 'consultations_pos_compra';
       
+      console.log('Updating consultation:', { id, type, updateData, tableName });
+      
       const { data, error } = await supabase
         .from(tableName)
         .update(updateData)
         .eq('id', id)
-        .select()
-        .single();
+        .select();
       
-      if (error) throw error;
-      return { ...data, type };
+      console.log('Update result:', { data, error });
+      
+      if (error) {
+        console.error('Update error:', error);
+        throw error;
+      }
+      
+      return { ...data[0], type };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultations'] });
+      queryClient.invalidateQueries({ queryKey: ['specialist-consultations'] });
+      queryClient.invalidateQueries({ queryKey: ['meeting-rooms'] });
     }
   });
 };

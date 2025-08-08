@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface CreateSpecialistData {
@@ -19,58 +18,40 @@ export const useCreateSpecialist = () => {
 
   return useMutation({
     mutationFn: async (data: CreateSpecialistData) => {
-      // 1. Criar usuário na autenticação
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Validar dados antes de enviar
+      console.log('Dados recebidos:', data);
+      
+      if (!data.email || !data.password || !data.fullName || !data.crp) {
+        throw new Error('Campos obrigatórios não preenchidos');
+      }
+      
+      const requestBody = {
         email: data.email,
         password: data.password,
-        options: {
-          data: {
-            full_name: data.fullName,
-            phone: data.phone,
-            crp: data.crp
-          }
-        }
+        name: data.fullName,
+        specialty: Array.isArray(data.specialties) ? data.specialties.join(', ') : data.specialties || '',
+        crp: data.crp,
+        phone: data.phone || ''
+      };
+      
+      console.log('Dados enviados:', requestBody);
+      
+      const response = await fetch('https://utoilskthbtlqgpjauui.supabase.co/functions/v1/create-specialist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0b2lsc2t0aGJ0bHFncGphdXVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyNzM2MjYsImV4cCI6MjA2Mzg0OTYyNn0.ZNLD_MB-Juc1dSJ1UMMmXpT8UzrBH-JFguyQiUZdDqU',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0b2lsc2t0aGJ0bHFncGphdXVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyNzM2MjYsImV4cCI6MjA2Mzg0OTYyNn0.ZNLD_MB-Juc1dSJ1UMMmXpT8UzrBH-JFguyQiUZdDqU',
+        },
+        body: JSON.stringify(requestBody),
       });
 
-      if (authError) throw authError;
-
-      if (!authData.user) {
-        throw new Error('Erro ao criar usuário');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao criar especialista');
       }
 
-      // 2. Atualizar perfil com dados completos e role de specialist
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          full_name: data.fullName,
-          phone: data.phone,
-          crp: data.crp,
-          role: 'specialist',
-          cpf_cnpj: '00000000000' // Valor temporário, pode ser editado depois
-        })
-        .eq('id', authData.user.id);
-
-      if (profileError) throw profileError;
-
-      // 3. Criar registro de especialista
-      const { data: specialistData, error: specialistError } = await supabase
-        .from('specialists')
-        .insert({
-          user_id: authData.user.id,
-          bio: data.bio,
-          specialties: data.specialties,
-          is_available: true
-        })
-        .select()
-        .single();
-
-      if (specialistError) throw specialistError;
-
-      // 4. Criar configuração padrão de horários
-      await supabase.rpc('create_default_specialist_schedule', {
-        p_specialist_id: authData.user.id // Usar user_id em vez do specialist.id
-      });
-
+      const specialistData = await response.json();
       return specialistData;
     },
     onSuccess: () => {

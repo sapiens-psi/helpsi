@@ -15,21 +15,24 @@ export const useClientConsultations = () => {
       const { data: preCompraData, error: preCompraError } = await supabase
         .from('consultations_pre_compra')
         .select(`
-          *,
-          specialist:specialists(
-            id,
-            specialties,
-            profiles!specialists_user_id_fkey(
-              full_name
-            )
-          ),
-          meeting_room:meeting_rooms(
-            id,
-            room_token,
-            name,
-            is_active,
-            scheduled_at
-          )
+          id,
+          client_id,
+          specialist_id,
+          slot_id,
+          type,
+          status,
+          scheduled_date,
+          scheduled_time,
+          duration_minutes,
+          description,
+          purchase_date,
+          meeting_room_id,
+          recording_url,
+          recording_expires_at,
+          coupon_code_used,
+          coupon_id,
+          created_at,
+          updated_at
         `)
         .eq('client_id', user.id)
         .order('scheduled_date', { ascending: false });
@@ -40,21 +43,24 @@ export const useClientConsultations = () => {
       const { data: posCompraData, error: posCompraError } = await supabase
         .from('consultations_pos_compra')
         .select(`
-          *,
-          specialist:specialists(
-            id,
-            specialties,
-            profiles!specialists_user_id_fkey(
-              full_name
-            )
-          ),
-          meeting_room:meeting_rooms(
-            id,
-            room_token,
-            name,
-            is_active,
-            scheduled_at
-          )
+          id,
+          client_id,
+          specialist_id,
+          slot_id,
+          type,
+          status,
+          scheduled_date,
+          scheduled_time,
+          duration_minutes,
+          description,
+          purchase_date,
+          meeting_room_id,
+          recording_url,
+          recording_expires_at,
+          coupon_code_used,
+          coupon_id,
+          created_at,
+          updated_at
         `)
         .eq('client_id', user.id)
         .order('scheduled_date', { ascending: false });
@@ -84,6 +90,7 @@ export const useCancelConsultation = () => {
       // Determinar a tabela correta baseada no tipo
       const tableName = type === 'pre-compra' ? 'consultations_pre_compra' : 'consultations_pos_compra';
 
+      // Atualizar o status da consulta
       const { data, error } = await supabase
         .from(tableName)
         .update({ status: 'cancelada' })
@@ -93,10 +100,13 @@ export const useCancelConsultation = () => {
         .single();
 
       if (error) throw error;
+
       return { ...data, type };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['client-consultations'] });
+      queryClient.invalidateQueries({ queryKey: ['consultations'] });
+      queryClient.invalidateQueries({ queryKey: ['meeting-rooms'] });
       toast.success('Consulta cancelada com sucesso!');
     },
     onError: (error: any) => {
@@ -134,10 +144,13 @@ export const useRescheduleConsultation = () => {
         .single();
 
       if (error) throw error;
+
       return { ...data, type };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['client-consultations'] });
+      queryClient.invalidateQueries({ queryKey: ['consultations'] });
+      queryClient.invalidateQueries({ queryKey: ['meeting-rooms'] });
       toast.success('Consulta reagendada com sucesso!');
     },
     onError: (error: any) => {
