@@ -1,22 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { User, Calendar, Clock, MessageCircle, Video, Mic, PhoneOff, Monitor, Volume2 } from 'lucide-react';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
-import { ChevronDown } from 'lucide-react';
+import { User, Clock, Video, Mic, PhoneOff, Monitor } from 'lucide-react';
 import './VideoConference.css';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-
-interface PeerConnection {
-  userId: string;
-  connection: RTCPeerConnection;
-  stream?: MediaStream;
-}
 
 const VideoConference = () => {
   const [isVideoOn, setIsVideoOn] = useState(true);
@@ -26,17 +17,12 @@ const VideoConference = () => {
   const [chatMessages, setChatMessages] = useState<any[]>([]);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
-  const screenShareRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const screenVideoRef = useRef<HTMLVideoElement>(null);
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
-  const [peerConnections, setPeerConnections] = useState<Map<string, PeerConnection>>(new Map());
-
-  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string | undefined>(undefined);
-  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState<string | undefined>(undefined);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
 
   const navigate = useNavigate();
   const { id: roomId } = useParams();
@@ -44,17 +30,16 @@ const VideoConference = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [ending, setEnding] = useState(false);
   
-  // Realtime states
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
-  const [connectedUsers, setConnectedUsers] = useState<Set<string>>(new Set());
-  const [remoteStreams, setRemoteStreams] = useState<Map<string, { video: boolean; audio: boolean; screen: boolean }>>(new Map());
+  const [connectedUsers, setConnectedUsers] = useState<string[]>([]);
 
-  // ICE servers configuration for better connectivity
-  const iceServers = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-  ];
+  // STUN servers para conectividade
+  const rtcConfig = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  };
 
   // Buscar informações da sala
   const { data: room, isLoading: isLoadingRoom } = useQuery({
@@ -72,164 +57,128 @@ const VideoConference = () => {
     enabled: !!roomId,
   });
 
-  // Initialize local media stream
+  // Inicializar stream local
   const initializeLocalStream = useCallback(async () => {
     try {
-      const constraints: MediaStreamConstraints = {
-        video: isVideoOn,
-        audio: selectedAudioDeviceId ? 
-          { deviceId: { exact: selectedAudioDeviceId } } : 
-          isAudioOn
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      setLocalStream(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
       
+      setLocalStream(stream);
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
-
-      // Update existing peer connections with new stream
-      peerConnections.forEach((peerConn) => {
-        const senders = peerConn.connection.getSenders();
-        stream.getTracks().forEach(track => {
-          const sender = senders.find(s => s.track?.kind === track.kind);
-          if (sender) {
-            sender.replaceTrack(track);
-          } else {
-            peerConn.connection.addTrack(track, stream);
-          }
-        });
-      });
-
+      
+      console.log('Local stream initialized');
       return stream;
     } catch (error) {
       console.error('Error accessing media devices:', error);
       return null;
     }
-  }, [isVideoOn, isAudioOn, selectedAudioDeviceId, peerConnections]);
+  }, []);
 
-  // Create peer connection
-  const createPeerConnection = useCallback((userId: string): RTCPeerConnection => {
-    const peerConnection = new RTCPeerConnection({ iceServers });
-
-    // Handle incoming stream
-    peerConnection.ontrack = (event) => {
-      console.log('Received remote stream from:', userId);
-      const [remoteStream] = event.streams;
-      const videoElement = remoteVideoRefs.current.get(userId);
-      if (videoElement) {
-        videoElement.srcObject = remoteStream;
+  // Criar conexão WebRTC
+  const createPeerConnection = useCallback(() => {
+    const pc = new RTCPeerConnection(rtcConfig);
+    
+    // Quando receber stream remoto
+    pc.ontrack = (event) => {
+      console.log('Received remote stream');
+      const [stream] = event.streams;
+      setRemoteStream(stream);
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = stream;
       }
     };
-
-    // Handle ICE candidates
-    peerConnection.onicecandidate = (event) => {
+    
+    // Quando candidato ICE for gerado
+    pc.onicecandidate = (event) => {
       if (event.candidate && channel) {
+        console.log('Sending ICE candidate');
         channel.send({
           type: 'broadcast',
           event: 'ice-candidate',
           payload: {
             candidate: event.candidate,
-            targetUserId: userId,
-            fromUserId: profile?.id
+            from: profile?.id
           }
         });
       }
     };
-
-    // Handle connection state changes
-    peerConnection.onconnectionstatechange = () => {
-      console.log(`Connection state with ${userId}:`, peerConnection.connectionState);
-      if (peerConnection.connectionState === 'failed') {
-        console.log('Connection failed, attempting to restart ICE');
-        peerConnection.restartIce();
-      }
+    
+    // Monitorar estado da conexão
+    pc.onconnectionstatechange = () => {
+      console.log('Connection state:', pc.connectionState);
     };
-
-    return peerConnection;
+    
+    return pc;
   }, [channel, profile?.id]);
 
-  // Handle WebRTC signaling
+  // Lidar com sinalização WebRTC
   const handleSignaling = useCallback(async (payload: any) => {
-    const { fromUserId, offer, answer, candidate } = payload;
+    if (!peerConnection) return;
     
-    if (!fromUserId || fromUserId === profile?.id) return;
-
-    let peerConn = peerConnections.get(fromUserId);
+    const { offer, answer, candidate, from } = payload;
     
-    if (!peerConn) {
-      const connection = createPeerConnection(fromUserId);
-      peerConn = { userId: fromUserId, connection };
-      setPeerConnections(prev => new Map(prev).set(fromUserId, peerConn!));
-      
-      // Add local stream to the connection
-      if (localStream) {
-        localStream.getTracks().forEach(track => {
-          connection.addTrack(track, localStream);
-        });
+    if (from === profile?.id) return; // Ignorar próprias mensagens
+    
+    try {
+      if (offer) {
+        console.log('Received offer');
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        const answerDescription = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answerDescription);
+        
+        if (channel) {
+          channel.send({
+            type: 'broadcast',
+            event: 'answer',
+            payload: {
+              answer: answerDescription,
+              from: profile?.id
+            }
+          });
+        }
+      } else if (answer) {
+        console.log('Received answer');
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+      } else if (candidate) {
+        console.log('Received ICE candidate');
+        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
       }
+    } catch (error) {
+      console.error('Error handling signaling:', error);
     }
+  }, [peerConnection, channel, profile?.id]);
 
-    if (offer) {
-      await peerConn.connection.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await peerConn.connection.createAnswer();
-      await peerConn.connection.setLocalDescription(answer);
-      
-      if (channel) {
-        channel.send({
-          type: 'broadcast',
-          event: 'webrtc-answer',
-          payload: {
-            answer,
-            targetUserId: fromUserId,
-            fromUserId: profile?.id
-          }
-        });
-      }
-    }
-
-    if (answer) {
-      await peerConn.connection.setRemoteDescription(new RTCSessionDescription(answer));
-    }
-
-    if (candidate) {
-      await peerConn.connection.addIceCandidate(new RTCIceCandidate(candidate));
-    }
-  }, [peerConnections, createPeerConnection, localStream, channel, profile?.id]);
-
-  // Initialize offer to new user
-  const initiateCall = useCallback(async (targetUserId: string) => {
-    if (targetUserId === profile?.id) return;
-
-    const connection = createPeerConnection(targetUserId);
-    const peerConn = { userId: targetUserId, connection };
-    setPeerConnections(prev => new Map(prev).set(targetUserId, peerConn));
-
-    // Add local stream
-    if (localStream) {
-      localStream.getTracks().forEach(track => {
-        connection.addTrack(track, localStream);
-      });
-    }
-
-    const offer = await connection.createOffer();
-    await connection.setLocalDescription(offer);
-
+  // Iniciar chamada com novo usuário
+  const initiateCall = useCallback(async () => {
+    if (!peerConnection || !localStream) return;
+    
+    // Adicionar stream local ao peer connection
+    localStream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, localStream);
+    });
+    
+    // Criar offer
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    
     if (channel) {
+      console.log('Sending offer');
       channel.send({
         type: 'broadcast',
-        event: 'webrtc-offer',
+        event: 'offer',
         payload: {
           offer,
-          targetUserId,
-          fromUserId: profile?.id
+          from: profile?.id
         }
       });
     }
-  }, [createPeerConnection, localStream, channel, profile?.id]);
+  }, [peerConnection, localStream, channel, profile?.id]);
 
-  // Setup Realtime channel for communication
+  // Configurar canal de comunicação em tempo real
   useEffect(() => {
     if (!roomId || !profile?.id) return;
 
@@ -241,75 +190,43 @@ const VideoConference = () => {
       },
     });
 
-    // Handle presence changes (users joining/leaving)
     roomChannel
       .on('presence', { event: 'sync' }, () => {
         const state = roomChannel.presenceState();
         const users = Object.keys(state);
-        const newConnectedUsers = new Set(users);
-        
-        // Initiate calls to newly joined users
-        newConnectedUsers.forEach(userId => {
-          if (userId !== profile.id && !connectedUsers.has(userId)) {
-            console.log('New user joined, initiating call:', userId);
-            initiateCall(userId);
-          }
-        });
-
-        setConnectedUsers(newConnectedUsers);
+        setConnectedUsers(users);
         console.log('Connected users:', users);
       })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        console.log('User joined:', key, newPresences);
-      })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        console.log('User left:', key, leftPresences);
-        // Clean up peer connection
-        const peerConn = peerConnections.get(key);
-        if (peerConn) {
-          peerConn.connection.close();
-          setPeerConnections(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(key);
-            return newMap;
-          });
-        }
-        remoteVideoRefs.current.delete(key);
-      })
-      // Handle WebRTC signaling
-      .on('broadcast', { event: 'webrtc-offer' }, ({ payload }) => {
-        if (payload.targetUserId === profile.id) {
-          handleSignaling(payload);
+      .on('presence', { event: 'join' }, ({ key }) => {
+        console.log('User joined:', key);
+        // Se outro usuário entrou e sou o primeiro, inicio a chamada
+        if (connectedUsers.length === 0) {
+          setTimeout(() => initiateCall(), 1000);
         }
       })
-      .on('broadcast', { event: 'webrtc-answer' }, ({ payload }) => {
-        if (payload.targetUserId === profile.id) {
-          handleSignaling(payload);
+      .on('presence', { event: 'leave' }, ({ key }) => {
+        console.log('User left:', key);
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = null;
         }
+        setRemoteStream(null);
+      })
+      // Sinalização WebRTC
+      .on('broadcast', { event: 'offer' }, ({ payload }) => {
+        handleSignaling(payload);
+      })
+      .on('broadcast', { event: 'answer' }, ({ payload }) => {
+        handleSignaling(payload);
       })
       .on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
-        if (payload.targetUserId === profile.id) {
-          handleSignaling(payload);
-        }
-      })
-      // Handle media state changes
-      .on('broadcast', { event: 'media_state' }, (payload) => {
-        const { userId, videoEnabled, audioEnabled, screenSharing } = payload.payload;
-        if (userId !== profile.id) {
-          setRemoteStreams(prev => new Map(prev).set(userId, {
-            video: videoEnabled,
-            audio: audioEnabled,
-            screen: screenSharing
-          }));
-        }
+        handleSignaling(payload);
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          console.log('Successfully connected to room channel');
-          // Track presence
+          console.log('Connected to room channel');
           await roomChannel.track({
             user_id: profile.id,
-            user_name: profile.full_name || profile.email,
+            user_name: profile.full_name || 'User',
             online_at: new Date().toISOString(),
           });
         }
@@ -320,29 +237,30 @@ const VideoConference = () => {
     return () => {
       roomChannel.unsubscribe();
     };
-  }, [roomId, profile?.id, profile?.full_name, profile?.email, initiateCall, handleSignaling, connectedUsers, peerConnections]);
+  }, [roomId, profile?.id, profile?.full_name, handleSignaling, connectedUsers.length, initiateCall]);
 
-  // Initialize local stream
+  // Inicializar WebRTC e stream
   useEffect(() => {
-    initializeLocalStream();
-  }, [initializeLocalStream]);
-
-  // Load device lists
-  useEffect(() => {
-    navigator.mediaDevices.enumerateDevices().then(devices => {
-      const mics = devices.filter(device => device.kind === 'audioinput');
-      setAudioDevices(mics);
-      if (!selectedAudioDeviceId && mics.length > 0) {
-        setSelectedAudioDeviceId(mics[0].deviceId);
+    const init = async () => {
+      // Criar peer connection
+      const pc = createPeerConnection();
+      setPeerConnection(pc);
+      
+      // Inicializar stream local
+      await initializeLocalStream();
+    };
+    
+    init();
+    
+    return () => {
+      if (peerConnection) {
+        peerConnection.close();
       }
-
-      const outputs = devices.filter(device => device.kind === 'audiooutput');
-      setAudioOutputDevices(outputs);
-      if (!selectedAudioOutputDeviceId && outputs.length > 0) {
-        setSelectedAudioOutputDeviceId(outputs[0].deviceId);
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
       }
-    });
-  }, [selectedAudioDeviceId, selectedAudioOutputDeviceId]);
+    };
+  }, [createPeerConnection, initializeLocalStream]);
 
   // Load existing chat messages and setup realtime subscription
   useEffect(() => {
@@ -408,56 +326,24 @@ const VideoConference = () => {
   }, [roomId]);
 
   const toggleVideo = useCallback(() => {
-    const newVideoState = !isVideoOn;
-    setIsVideoOn(newVideoState);
-    
+    setIsVideoOn(!isVideoOn);
     if (localStream) {
       const videoTrack = localStream.getVideoTracks()[0];
       if (videoTrack) {
-        videoTrack.enabled = newVideoState;
+        videoTrack.enabled = !isVideoOn;
       }
     }
-    
-    // Broadcast video state change
-    if (channel && profile?.id) {
-      channel.send({
-        type: 'broadcast',
-        event: 'media_state',
-        payload: {
-          userId: profile.id,
-          videoEnabled: newVideoState,
-          audioEnabled: isAudioOn,
-          screenSharing: isScreenSharing
-        }
-      });
-    }
-  }, [isVideoOn, localStream, channel, profile?.id, isAudioOn, isScreenSharing]);
+  }, [isVideoOn, localStream]);
 
   const toggleAudio = useCallback(() => {
-    const newAudioState = !isAudioOn;
-    setIsAudioOn(newAudioState);
-    
+    setIsAudioOn(!isAudioOn);
     if (localStream) {
       const audioTrack = localStream.getAudioTracks()[0];
       if (audioTrack) {
-        audioTrack.enabled = newAudioState;
+        audioTrack.enabled = !isAudioOn;
       }
     }
-    
-    // Broadcast audio state change
-    if (channel && profile?.id) {
-      channel.send({
-        type: 'broadcast',
-        event: 'media_state',
-        payload: {
-          userId: profile.id,
-          videoEnabled: isVideoOn,
-          audioEnabled: newAudioState,
-          screenSharing: isScreenSharing
-        }
-      });
-    }
-  }, [isAudioOn, localStream, channel, profile?.id, isVideoOn, isScreenSharing]);
+  }, [isAudioOn, localStream]);
 
   const toggleScreenShare = useCallback(async () => {
     if (!isScreenSharing) {
@@ -467,107 +353,58 @@ const VideoConference = () => {
           audio: true 
         });
         
-        setScreenStream(stream);
-        if (screenShareRef.current) {
-          screenShareRef.current.srcObject = stream;
+        if (screenVideoRef.current) {
+          screenVideoRef.current.srcObject = stream;
         }
         
-        // Replace video track in all peer connections
-        peerConnections.forEach((peerConn) => {
-          const videoSender = peerConn.connection.getSenders().find(
-            sender => sender.track?.kind === 'video'
+        // Substituir track de vídeo na conexão peer
+        if (peerConnection) {
+          const sender = peerConnection.getSenders().find(s => 
+            s.track && s.track.kind === 'video'
           );
-          if (videoSender) {
-            videoSender.replaceTrack(stream.getVideoTracks()[0]);
+          if (sender) {
+            sender.replaceTrack(stream.getVideoTracks()[0]);
           }
-        });
+        }
         
         setIsScreenSharing(true);
         
-        // Broadcast screen sharing state
-        if (channel && profile?.id) {
-          channel.send({
-            type: 'broadcast',
-            event: 'media_state',
-            payload: {
-              userId: profile.id,
-              videoEnabled: isVideoOn,
-              audioEnabled: isAudioOn,
-              screenSharing: true
-            }
-          });
-        }
-        
         stream.getVideoTracks()[0].addEventListener('ended', () => {
           setIsScreenSharing(false);
-          setScreenStream(null);
-          if (screenShareRef.current) {
-            screenShareRef.current.srcObject = null;
+          if (screenVideoRef.current) {
+            screenVideoRef.current.srcObject = null;
           }
           
-          // Restore camera video track
-          if (localStream) {
-            peerConnections.forEach((peerConn) => {
-              const videoSender = peerConn.connection.getSenders().find(
-                sender => sender.track?.kind === 'video'
-              );
-              if (videoSender) {
-                videoSender.replaceTrack(localStream.getVideoTracks()[0]);
-              }
-            });
-          }
-          
-          // Broadcast screen sharing stopped
-          if (channel && profile?.id) {
-            channel.send({
-              type: 'broadcast',
-              event: 'media_state',
-              payload: {
-                userId: profile.id,
-                videoEnabled: isVideoOn,
-                audioEnabled: isAudioOn,
-                screenSharing: false
-              }
-            });
+          // Restaurar câmera
+          if (localStream && peerConnection) {
+            const sender = peerConnection.getSenders().find(s => 
+              s.track && s.track.kind === 'video'
+            );
+            if (sender) {
+              sender.replaceTrack(localStream.getVideoTracks()[0]);
+            }
           }
         });
       } catch (err) {
         console.log('Erro ao compartilhar tela:', err);
       }
     } else {
-      if (screenStream) {
-        screenStream.getTracks().forEach(track => track.stop());
-        setScreenStream(null);
-      }
       setIsScreenSharing(false);
-      
-      // Restore camera video track
-      if (localStream) {
-        peerConnections.forEach((peerConn) => {
-          const videoSender = peerConn.connection.getSenders().find(
-            sender => sender.track?.kind === 'video'
-          );
-          if (videoSender) {
-            videoSender.replaceTrack(localStream.getVideoTracks()[0]);
-          }
-        });
+      if (screenVideoRef.current) {
+        screenVideoRef.current.srcObject = null;
       }
       
-      // Broadcast screen sharing stopped
-      if (channel && profile?.id) {
-        channel.send({
-          type: 'broadcast',
-          event: 'media_state',
-          payload: {
-            userId: profile.id,
-            videoEnabled: isVideoOn,
-            audioEnabled: isAudioOn,
-            screenSharing: false
-          }
-        });
+      // Restaurar câmera
+      if (localStream && peerConnection) {
+        const sender = peerConnection.getSenders().find(s => 
+          s.track && s.track.kind === 'video'
+        );
+        if (sender) {
+          sender.replaceTrack(localStream.getVideoTracks()[0]);
+        }
       }
     }
-  }, [isScreenSharing, screenStream, localStream, peerConnections, channel, profile?.id, isVideoOn, isAudioOn]);
+  }, [isScreenSharing, localStream, peerConnection]);
 
   const sendMessage = async () => {
     if (chatMessage.trim() && profile && roomId) {
@@ -603,20 +440,17 @@ const VideoConference = () => {
   const confirmEndCall = async () => {
     setEnding(true);
     
-    // Stop all streams
+    // Parar streams
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
     }
-    if (screenStream) {
-      screenStream.getTracks().forEach(track => track.stop());
+    
+    // Fechar conexão peer
+    if (peerConnection) {
+      peerConnection.close();
     }
     
-    // Close all peer connections
-    peerConnections.forEach((peerConn) => {
-      peerConn.connection.close();
-    });
-    
-    // Update room status
+    // Atualizar status da sala
     if (roomId) {
       await supabase.from('meeting_rooms').update({ 
         is_active: false, 
@@ -627,7 +461,7 @@ const VideoConference = () => {
     setShowConfirm(false);
     setEnding(false);
     
-    // Redirect based on user role
+    // Redirecionar baseado no papel do usuário
     if (profile?.role === 'admin') {
       navigate('/admin', { replace: true });
     } else {
@@ -639,16 +473,6 @@ const VideoConference = () => {
     setShowConfirm(false);
   };
 
-  // Helper function to create video element refs for remote users
-  const createRemoteVideoRef = useCallback((userId: string) => {
-    return (el: HTMLVideoElement | null) => {
-      if (el) {
-        remoteVideoRefs.current.set(userId, el);
-      } else {
-        remoteVideoRefs.current.delete(userId);
-      }
-    };
-  }, []);
 
   // Loading and error states
   if (isLoadingRoom) {
@@ -713,7 +537,7 @@ const VideoConference = () => {
             <div className="text-white">
               <h1 className="text-lg font-semibold">Consulta - {room.type}</h1>
               <p className="text-sm text-gray-300">
-                Sala: {room.name} | Participantes: {connectedUsers.size}
+                Sala: {room.name} | Participantes: {connectedUsers.length}
               </p>
             </div>
           </div>
@@ -731,12 +555,12 @@ const VideoConference = () => {
       </header>
 
       <div className="flex-1 flex gap-4 p-4">
-        {/* Screen sharing area when active */}
+        {/* Área de compartilhamento de tela */}
         {isScreenSharing && (
           <div className="flex-1 flex items-center justify-center">
             <div className="relative rounded-2xl overflow-hidden bg-gray-900 shadow-lg w-full max-w-4xl aspect-video">
               <video
-                ref={screenShareRef}
+                ref={screenVideoRef}
                 autoPlay
                 muted
                 className="w-full h-full object-contain"
@@ -748,10 +572,10 @@ const VideoConference = () => {
           </div>
         )}
 
-        {/* Video grid */}
+        {/* Grade de vídeos */}
         <div className={`${isScreenSharing ? 'w-80 flex flex-col gap-4' : 'flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4'}`}>
-          {/* Local Video */}
-          <div className={`relative bg-gray-800 rounded-lg overflow-hidden ${isScreenSharing ? 'aspect-video' : ''}`}>
+          {/* Vídeo local */}
+          <div className={`relative bg-gray-800 rounded-lg overflow-hidden ${isScreenSharing ? 'aspect-video' : 'min-h-[300px]'}`}>
             {isVideoOn ? (
               <video
                 ref={localVideoRef}
@@ -772,42 +596,33 @@ const VideoConference = () => {
               <div className="flex gap-1 mt-1">
                 <div className={`w-2 h-2 rounded-full ${isVideoOn ? 'bg-green-500' : 'bg-red-500'}`} />
                 <div className={`w-2 h-2 rounded-full ${isAudioOn ? 'bg-green-500' : 'bg-red-500'}`} />
-                {isScreenSharing && <div className="w-2 h-2 rounded-full bg-blue-500" />}
               </div>
             </div>
           </div>
 
-          {/* Remote Videos */}
-          {Array.from(connectedUsers).filter(userId => userId !== profile?.id).map(userId => {
-            const userStreamState = remoteStreams.get(userId) || { video: false, audio: false, screen: false };
-            return (
-              <div key={userId} className={`relative bg-gray-800 rounded-lg overflow-hidden ${isScreenSharing ? 'aspect-video' : ''}`}>
-                {userStreamState.video ? (
-                  <video
-                    ref={createRemoteVideoRef(userId)}
-                    autoPlay
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-700">
-                    <div className="text-center text-white">
-                      <User className="mx-auto h-16 w-16 mb-2" />
-                      <p>Participante</p>
-                      <p className="text-sm text-gray-300">Câmera desligada</p>
-                    </div>
-                  </div>
-                )}
-                <div className="absolute bottom-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-sm">
-                  Participante
-                  <div className="flex gap-1 mt-1">
-                    <div className={`w-2 h-2 rounded-full ${userStreamState.video ? 'bg-green-500' : 'bg-red-500'}`} />
-                    <div className={`w-2 h-2 rounded-full ${userStreamState.audio ? 'bg-green-500' : 'bg-red-500'}`} />
-                    {userStreamState.screen && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+          {/* Vídeo remoto */}
+          {connectedUsers.filter(userId => userId !== profile?.id).length > 0 && (
+            <div className={`relative bg-gray-800 rounded-lg overflow-hidden ${isScreenSharing ? 'aspect-video' : 'min-h-[300px]'}`}>
+              {remoteStream ? (
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-700">
+                  <div className="text-center text-white">
+                    <User className="mx-auto h-16 w-16 mb-2" />
+                    <p>Participante</p>
+                    <p className="text-sm text-gray-300">Conectando...</p>
                   </div>
                 </div>
+              )}
+              <div className="absolute bottom-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-sm">
+                Participante
               </div>
-            );
-          })}
+            </div>
+          )}
         </div>
 
         {/* Chat Sidebar */}
@@ -845,109 +660,55 @@ const VideoConference = () => {
         </div>
       </div>
 
-      {/* Controls */}
+      {/* Controles */}
       <div className="bg-gray-800 p-4 border-t border-gray-700">
         <div className="flex justify-center space-x-4">
-          {/* Audio Control */}
-          <div className="relative flex items-center">
-            <Button
-              onClick={toggleAudio}
-              variant="ghost"
-              size="icon"
-              className={`bg-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center hover:bg-blue-100 transition ${isAudioOn ? 'text-blue-700' : 'text-red-600'}`}
-              title={isAudioOn ? 'Desligar microfone' : 'Ligar microfone'}
-            >
-              <Mic className="icon-medium" />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute -right-2 -bottom-2 w-8 h-8 bg-white border border-gray-200 shadow rounded-full flex items-center justify-center p-0"
-                  title="Selecionar microfone"
-                >
-                  <ChevronDown className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {audioDevices.length === 0 && (
-                  <DropdownMenuItem disabled>Nenhum microfone encontrado</DropdownMenuItem>
-                )}
-                {audioDevices.map(device => (
-                  <DropdownMenuItem
-                    key={device.deviceId}
-                    onClick={() => setSelectedAudioDeviceId(device.deviceId)}
-                    className={selectedAudioDeviceId === device.deviceId ? 'bg-blue-100' : ''}
-                  >
-                    {device.label || `Microfone ${device.deviceId.slice(0, 8)}`}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          {/* Controle de áudio */}
+          <Button
+            onClick={toggleAudio}
+            variant="ghost"
+            size="icon"
+            className={`shadow-lg rounded-full w-16 h-16 flex items-center justify-center transition ${
+              isAudioOn 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                : 'bg-red-600 hover:bg-red-700 text-white'
+            }`}
+            title={isAudioOn ? 'Desligar microfone' : 'Ligar microfone'}
+          >
+            <Mic className="icon-medium" />
+          </Button>
 
-          {/* Video Control */}
+          {/* Controle de vídeo */}
           <Button
             onClick={toggleVideo}
             variant="ghost"
             size="icon"
-            className={`bg-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center hover:bg-blue-100 transition ${isVideoOn ? 'text-blue-700' : 'text-red-600'}`}
+            className={`shadow-lg rounded-full w-16 h-16 flex items-center justify-center transition ${
+              isVideoOn 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                : 'bg-red-600 hover:bg-red-700 text-white'
+            }`}
             title={isVideoOn ? 'Desligar câmera' : 'Ligar câmera'}
           >
             <Video className="icon-medium" />
           </Button>
 
-          {/* Screen Share Control */}
+          {/* Compartilhamento de tela */}
           <Button
             onClick={toggleScreenShare}
             variant="ghost"
             size="icon"
-            className={`bg-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center hover:bg-blue-100 transition ${isScreenSharing ? 'text-blue-700' : 'text-gray-700'}`}
+            className={`shadow-lg rounded-full w-16 h-16 flex items-center justify-center transition ${
+              isScreenSharing 
+                ? 'bg-green-600 hover:bg-green-700 text-white' 
+                : 'bg-gray-600 hover:bg-gray-700 text-white'
+            }`}
             title={isScreenSharing ? 'Parar compartilhamento' : 'Compartilhar tela'}
           >
             <Monitor className="icon-medium" />
           </Button>
 
-          {/* Audio Output Control */}
-          <div className="relative flex items-center">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="bg-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center hover:bg-blue-100 transition text-gray-700"
-              title="Configurar alto-falante"
-            >
-              <Volume2 className="icon-medium" />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute -right-2 -bottom-2 w-8 h-8 bg-white border border-gray-200 shadow rounded-full flex items-center justify-center p-0"
-                  title="Selecionar alto-falante"
-                >
-                  <ChevronDown className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {audioOutputDevices.length === 0 && (
-                  <DropdownMenuItem disabled>Nenhum alto-falante encontrado</DropdownMenuItem>
-                )}
-                {audioOutputDevices.map(device => (
-                  <DropdownMenuItem
-                    key={device.deviceId}
-                    onClick={() => setSelectedAudioOutputDeviceId(device.deviceId)}
-                    className={selectedAudioOutputDeviceId === device.deviceId ? 'bg-blue-100' : ''}
-                  >
-                    {device.label || `Alto-falante ${device.deviceId.slice(0, 8)}`}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* End Call */}
+          {/* Encerrar chamada */}
           <Button
             onClick={endCall}
             variant="ghost"
