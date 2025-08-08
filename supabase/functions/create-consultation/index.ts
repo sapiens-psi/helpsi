@@ -255,6 +255,20 @@ Deno.serve(async (req: Request) => {
       console.log('Consultation created successfully, but meeting room creation failed');
     } else {
       console.log('Meeting room created:', meetingRoom);
+      
+      // Update consultation with meeting_room_id
+      const { error: updateError } = await supabaseClient
+        .from(tableName)
+        .update({ meeting_room_id: meetingRoom.id })
+        .eq('id', consultation.id);
+      
+      if (updateError) {
+        console.error('Error updating consultation with meeting_room_id:', updateError);
+      } else {
+        console.log('Consultation updated with meeting_room_id:', meetingRoom.id);
+        // Update the consultation object to include the meeting_room_id
+        consultation.meeting_room_id = meetingRoom.id;
+      }
     }
 
     const response = {
